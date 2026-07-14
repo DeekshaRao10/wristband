@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:pinput/pinput.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../services/family_service.dart';
+import 'package:pinput/pinput.dart';
 
 class JoinFamilyScreen extends StatefulWidget {
   const JoinFamilyScreen({super.key});
@@ -19,10 +19,20 @@ class _JoinFamilyScreenState
       TextEditingController();
 
   Map<String, dynamic>? familyData;
+
   bool loading = false;
 
   Future<void> searchFamily() async {
-    if (codeController.text.length != 6) return;
+    if (codeController.text.trim().length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Enter a valid 6-digit code",
+          ),
+        ),
+      );
+      return;
+    }
 
     setState(() {
       loading = true;
@@ -41,7 +51,9 @@ class _JoinFamilyScreenState
     if (result == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Invalid Invite Code"),
+          content: Text(
+            "Invalid Invite Code",
+          ),
         ),
       );
     }
@@ -49,30 +61,6 @@ class _JoinFamilyScreenState
 
   @override
   Widget build(BuildContext context) {
-    final defaultPinTheme = PinTheme(
-      width: 50,
-      height: 55,
-      textStyle: const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: AppColors.black,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: Colors.grey.shade300,
-        ),
-      ),
-    );
-
-    final focusedPinTheme = defaultPinTheme.copyDecorationWith(
-      border: Border.all(
-        color: AppColors.primary,
-        width: 2,
-      ),
-    );
-
     return Scaffold(
       backgroundColor: AppColors.background,
 
@@ -93,7 +81,6 @@ class _JoinFamilyScreenState
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: AppColors.black,
               ),
             ),
 
@@ -109,18 +96,27 @@ class _JoinFamilyScreenState
 
             const SizedBox(height: 30),
 
-            Pinput(
-              length: 6,
+            TextField(
               controller: codeController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              textAlign: TextAlign.center,
 
-              defaultPinTheme:
-                  defaultPinTheme,
+              decoration: InputDecoration(
+                hintText: "Enter Code",
+                counterText: "",
+                filled: true,
+                fillColor: AppColors.white,
+                border: OutlineInputBorder(
+                  borderRadius:
+                      BorderRadius.circular(12),
+                ),
+              ),
 
-              focusedPinTheme:
-                  focusedPinTheme,
-
-              onCompleted: (value) {
-                searchFamily();
+              onChanged: (_) {
+                if (codeController.text.length == 6) {
+                  searchFamily();
+                }
               },
             ),
 
@@ -131,8 +127,7 @@ class _JoinFamilyScreenState
 
             if (familyData != null)
               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(16),
 
                 decoration: BoxDecoration(
                   color: AppColors.white,
@@ -152,7 +147,7 @@ class _JoinFamilyScreenState
                       ),
                     ),
 
-                    const SizedBox(width: 15),
+                    const SizedBox(width: 16),
 
                     Expanded(
                       child: Column(
@@ -162,14 +157,8 @@ class _JoinFamilyScreenState
                           const Text(
                             "You're joining",
                             style: TextStyle(
-                              color:
-                                  AppColors.grey,
-                              fontSize: 12,
+                              color: AppColors.grey,
                             ),
-                          ),
-
-                          const SizedBox(
-                            height: 4,
                           ),
 
                           Text(

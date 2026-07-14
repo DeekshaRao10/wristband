@@ -38,7 +38,8 @@ class FamilyService {
       'familyName': familyName,
       'inviteCode': inviteCode,
       'createdBy': user.uid,
-      'createdAt': Timestamp.now(),
+'createdAt':
+FieldValue.serverTimestamp(),
     });
 
     return {
@@ -83,7 +84,7 @@ class FamilyService {
         .doc(user.uid)
         .set({
       'uid': user.uid,
-      'joinedAt': Timestamp.now(),
-    });
+'joinedAt':
+FieldValue.serverTimestamp(),    });
   }
 }

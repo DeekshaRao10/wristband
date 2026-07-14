@@ -4,129 +4,157 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/primary_button.dart';
 
 class FamilyMembersScreen extends StatelessWidget {
-  const FamilyMembersScreen({super.key});
+  final String familyName;
+  final String inviteCode;
+
+  const FamilyMembersScreen({
+    super.key,
+    required this.familyName,
+    required this.inviteCode,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
 
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-
-          child: Column(
-            children: [
-              Container(
-                width: 90,
-                height: 90,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.groups,
-                  color: AppColors.white,
-                  size: 45,
-                ),
-              ),
-
-              const SizedBox(height: 25),
-
-              const Text(
-                "Family Members",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.black,
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              const Text(
-                "Members currently in your SafeBand family group",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.grey,
-                  fontSize: 16,
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              _memberCard(
-                name: "You",
-                role: "Admin",
-              ),
-
-              const SizedBox(height: 12),
-
-              _memberCard(
-                name: "Father",
-                role: "Member",
-              ),
-
-              const SizedBox(height: 12),
-
-              _memberCard(
-                name: "Mother",
-                role: "Member",
-              ),
-
-              const SizedBox(height: 30),
-
-              PrimaryButton(
-                text: "Continue",
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Dashboard screen coming next",
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          "Family Members",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.black,
           ),
+        ),
+      ),
+
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius:
+                    BorderRadius.circular(20),
+              ),
+
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.groups,
+                    color: AppColors.primary,
+                    size: 50,
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  Text(
+                    familyName,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 5),
+
+                  Text(
+                    "Invite Code: $inviteCode",
+                    style: const TextStyle(
+                      color: AppColors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 25),
+
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "Members",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            Expanded(
+              child: ListView(
+                children: const [
+                  _MemberCard(
+                    name: "You",
+                    role: "Admin",
+                  ),
+                ],
+              ),
+            ),
+
+            PrimaryButton(
+              text: "Add a Band",
+              onPressed: () {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      "Band Pairing Screen Coming Next",
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
   }
+}
 
-  static Widget _memberCard({
-    required String name,
-    required String role,
-  }) {
+class _MemberCard extends StatelessWidget {
+  final String name;
+  final String role;
+
+  const _MemberCard({
+    required this.name,
+    required this.role,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
 
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
+        borderRadius:
+            BorderRadius.circular(16),
       ),
 
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 25,
+          const CircleAvatar(
             backgroundColor:
-                AppColors.primary.withOpacity(0.1),
-            child: const Icon(
+                AppColors.primary,
+            child: Icon(
               Icons.person,
-              color: AppColors.primary,
+              color: AppColors.white,
             ),
           ),
 
-          const SizedBox(width: 15),
+          const SizedBox(width: 12),
 
           Expanded(
             child: Column(
@@ -136,12 +164,10 @@ class FamilyMembersScreen extends StatelessWidget {
                 Text(
                   name,
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        FontWeight.bold,
                   ),
                 ),
-
-                const SizedBox(height: 4),
 
                 Text(
                   role,
@@ -150,26 +176,6 @@ class FamilyMembersScreen extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-          ),
-
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 6,
-            ),
-            decoration: BoxDecoration(
-              color:
-                  AppColors.primary.withOpacity(0.1),
-              borderRadius:
-                  BorderRadius.circular(20),
-            ),
-            child: Text(
-              role,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
             ),
           ),
         ],

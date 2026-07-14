@@ -134,8 +134,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: currentIndex == index
-                             ?AppColors.primary                      
-                               : Colors.grey.shade300,
+                        ? const Color(0xFF006D6F)
+                        : Colors.grey.shade300,
                   ),
                 ),
               ),

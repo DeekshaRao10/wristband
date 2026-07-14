@@ -3,7 +3,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/primary_button.dart';
-import 'family_choice_screen.dart';
+import 'family_members_screen.dart';
 
 class FamilyCreatedScreen extends StatelessWidget {
   final String familyName;
@@ -19,7 +19,9 @@ class FamilyCreatedScreen extends StatelessWidget {
     await SharePlus.instance.share(
       ShareParams(
         text:
-            'Join my SafeBand family!\n\nFamily: $familyName\nInvite Code: $inviteCode',
+            'Join my SafeBand Family!\n\n'
+            'Family Name: $familyName\n'
+            'Invite Code: $inviteCode',
       ),
     );
   }
@@ -38,8 +40,8 @@ class FamilyCreatedScreen extends StatelessWidget {
               const SizedBox(height: 40),
 
               Container(
-                width: 80,
-                height: 80,
+                width: 90,
+                height: 90,
                 decoration: const BoxDecoration(
                   color: AppColors.primary,
                   shape: BoxShape.circle,
@@ -47,11 +49,11 @@ class FamilyCreatedScreen extends StatelessWidget {
                 child: const Icon(
                   Icons.check_circle,
                   color: AppColors.white,
-                  size: 40,
+                  size: 50,
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
               const Text(
                 "Family Created!",
@@ -65,10 +67,11 @@ class FamilyCreatedScreen extends StatelessWidget {
               const SizedBox(height: 10),
 
               Text(
-                "Share this code so family members can join the $familyName.",
+                "Share this invite code with your family members so they can join $familyName.",
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: AppColors.grey,
+                  fontSize: 16,
                 ),
               ),
 
@@ -80,7 +83,8 @@ class FamilyCreatedScreen extends StatelessWidget {
 
                 decoration: BoxDecoration(
                   color: AppColors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius:
+                      BorderRadius.circular(20),
                 ),
 
                 child: Column(
@@ -90,6 +94,7 @@ class FamilyCreatedScreen extends StatelessWidget {
                       style: TextStyle(
                         color: AppColors.grey,
                         letterSpacing: 2,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
 
@@ -98,7 +103,7 @@ class FamilyCreatedScreen extends StatelessWidget {
                     Text(
                       inviteCode,
                       style: const TextStyle(
-                        fontSize: 36,
+                        fontSize: 38,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
                       ),
@@ -107,66 +112,27 @@ class FamilyCreatedScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 20),
-
-              ElevatedButton.icon(
-                onPressed: _shareCode,
-                icon: const Icon(Icons.share),
-                label: const Text("Share Code"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  minimumSize:
-                      const Size(double.infinity, 50),
-                ),
-              ),
-
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
 
               PrimaryButton(
-                text: "Add a Band",
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Band setup will be added next.",
-                      ),
-                    ),
-                  );
+                text: "Share Code",
+                onPressed: () async {
+                  await _shareCode();
                 },
               ),
 
               const SizedBox(height: 15),
 
               OutlinedButton(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text(
-                        "Invite Members",
-                      ),
-                      content: Text(
-                        "Share this invite code:\n\n$inviteCode",
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _shareCode();
-                          },
-                          child: const Text(
-                            "Share",
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                onPressed: () async {
+                  await _shareCode();
                 },
+
                 style: OutlinedButton.styleFrom(
                   minimumSize:
-                      const Size(double.infinity, 50),
+                      const Size(double.infinity, 52),
                 ),
+
                 child: const Text(
                   "Invite Members",
                 ),
@@ -174,24 +140,23 @@ class FamilyCreatedScreen extends StatelessWidget {
 
               const Spacer(),
 
-              TextButton(
+              PrimaryButton(
+                text: "Continue",
                 onPressed: () {
-                  Navigator.pushAndRemoveUntil(
+                  Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
                       builder: (_) =>
-                          const FamilyChoiceScreen(),
+                          FamilyMembersScreen(
+                        familyName: familyName,
+                        inviteCode: inviteCode,
+                      ),
                     ),
-                    (route) => false,
                   );
                 },
-                child: const Text(
-                  "Go to Home",
-                  style: TextStyle(
-                    color: AppColors.black,
-                  ),
-                ),
               ),
+
+              const SizedBox(height: 10),
             ],
           ),
         ),
