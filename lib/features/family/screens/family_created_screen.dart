@@ -80,13 +80,17 @@ class FamilyCreatedScreen extends StatelessWidget {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
-
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   borderRadius:
                       BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 8,
+                    ),
+                  ],
                 ),
-
                 child: Column(
                   children: [
                     const Text(
@@ -112,27 +116,21 @@ class FamilyCreatedScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
 
               PrimaryButton(
                 text: "Share Code",
-                onPressed: () async {
-                  await _shareCode();
-                },
+                onPressed: _shareCode,
               ),
 
-              const SizedBox(height: 15),
+              const SizedBox(height: 12),
 
               OutlinedButton(
-                onPressed: () async {
-                  await _shareCode();
-                },
-
+                onPressed: _shareCode,
                 style: OutlinedButton.styleFrom(
                   minimumSize:
                       const Size(double.infinity, 52),
                 ),
-
                 child: const Text(
                   "Invite Members",
                 ),
@@ -156,7 +154,7 @@ class FamilyCreatedScreen extends StatelessWidget {
                 },
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
             ],
           ),
         ),

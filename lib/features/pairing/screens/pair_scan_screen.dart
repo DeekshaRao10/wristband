@@ -91,7 +91,7 @@ if (!mounted) return;
 Navigator.pushReplacement(
   context,
   MaterialPageRoute(
-    builder: (_) => const PairSetupScreen(),
+    builder: (_) => PairSetupScreen(),
   ),
 );
       // NEXT STEP:
@@ -125,13 +125,20 @@ Navigator.pushReplacement(
           AppColors.background,
 
       appBar: AppBar(
-        backgroundColor:
-            AppColors.background,
-        elevation: 0,
-        title: const Text(
-          "Add your SafeBand",
-        ),
-      ),
+  backgroundColor: AppColors.background,
+  elevation: 0,
+  title: const Text(
+    "Add your SafeBand",
+  ),
+  actions: [
+    IconButton(
+      icon: const Icon(Icons.refresh),
+      onPressed: () async {
+        await startScan();
+      },
+    ),
+  ],
+),
 
       body: Padding(
         padding: const EdgeInsets.all(20),

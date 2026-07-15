@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../pairing/screens/pair_scan_screen.dart';
 
 class FamilyMembersScreen extends StatelessWidget {
   final String familyName;
@@ -60,7 +61,8 @@ class FamilyMembersScreen extends StatelessWidget {
                     familyName,
                     style: const TextStyle(
                       fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                      fontWeight:
+                          FontWeight.bold,
                     ),
                   ),
 
@@ -84,7 +86,8 @@ class FamilyMembersScreen extends StatelessWidget {
                 "Members",
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  fontWeight:
+                      FontWeight.bold,
                 ),
               ),
             ),
@@ -103,14 +106,13 @@ class FamilyMembersScreen extends StatelessWidget {
             ),
 
             PrimaryButton(
-              text: "Add a Band",
+              text: "Add Band",
               onPressed: () {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      "Band Pairing Screen Coming Next",
-                    ),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const PairScanScreen(),
                   ),
                 );
               },
@@ -134,7 +136,8 @@ class _MemberCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin:
+          const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
 
       decoration: BoxDecoration(
