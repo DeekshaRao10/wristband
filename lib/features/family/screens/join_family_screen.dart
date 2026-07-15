@@ -260,10 +260,28 @@ class _JoinFamilyScreenState
             const Spacer(),
 
             if (familyData != null)
-              PrimaryButton(
-                text: "Confirm",
-                onPressed: showBandDialog,
-              ),
+             PrimaryButton(
+  text: "Confirm",
+  onPressed: () async {
+    try {
+      await FamilyService().joinFamily(
+        codeController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      showBandDialog();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString(),
+          ),
+        ),
+      );
+    }
+  },
+),
           ],
         ),
       ),
