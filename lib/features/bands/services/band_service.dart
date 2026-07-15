@@ -42,8 +42,21 @@ class BandService {
   }) async {
     final user = auth.currentUser!;
 
+    // Get current user's familyId
+    final userDoc = await firestore
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    final familyId =
+        userDoc.data()?['familyId'];
+
     await firestore.collection('bands').add({
       'ownerId': user.uid,
+
+      // IMPORTANT
+      'familyId': familyId,
+
       'bandName': bandName,
       'wearerName': wearerName,
       'age': age,
@@ -52,8 +65,11 @@ class BandService {
       'medicalConditions':
           medicalConditions,
       'doctorPhone': doctorPhone,
+
+      // Dummy values for now
       'heartRate': 0,
       'steps': 0,
+
       'createdAt':
           FieldValue.serverTimestamp(),
     });

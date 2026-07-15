@@ -45,113 +45,126 @@ class DashboardScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            Expanded(
-              child:
-                  StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore
-                    .instance
-                    .collection('bands')
-                    .where(
-                      'ownerId',
-                      isEqualTo: user!.uid,
-                    )
-                    .snapshots(),
+           Expanded(
+  child: FutureBuilder<DocumentSnapshot>(
+    future: FirebaseFirestore.instance
+        .collection('users')
+        .doc(user!.uid)
+        .get(),
+    builder: (context, userSnapshot) {
 
-                builder:
-                    (context, snapshot) {
-                  if (snapshot
-                          .connectionState ==
-                      ConnectionState
-                          .waiting) {
-                    return const Center(
-                      child:
-                          CircularProgressIndicator(),
-                    );
-                  }
+      if (!userSnapshot.hasData) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      }
 
-                  if (!snapshot.hasData ||
-                      snapshot
-                          .data!
-                          .docs
-                          .isEmpty) {
-                    return ListView(
-                      children: [
-                        const Center(
-                          child: Padding(
-                            padding:
-                                EdgeInsets.all(
-                                    20),
-                            child: Text(
-                              "No bands added yet",
-                            ),
-                          ),
-                        ),
+      final userData =
+          userSnapshot.data!.data()
+              as Map<String, dynamic>;
 
-                        _addBandCard(
-                          context,
-                        ),
-                      ],
-                    );
-                  }
+     final familyId =
+    userData['familyId'] ?? '';
+    if (familyId.isEmpty) {
+  return const Center(
+    child: Text(
+      'No family joined yet',
+    ),
+  );
+}
 
-                  final bands =
-                      snapshot.data!.docs;
+      return StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('bands')
+            .where(
+              'familyId',
+              isEqualTo: familyId,
+            )
+            .snapshots(),
+        builder: (context, snapshot) {
 
-                  return ListView.builder(
-                    itemCount:
-                        bands.length + 1,
+          if (snapshot.connectionState ==
+              ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-                    itemBuilder:
-                        (context, index) {
-                      if (index ==
-                          bands.length) {
-                        return Padding(
-                          padding:
-                              const EdgeInsets
-                                  .only(
-                            top: 12,
-                          ),
-                          child:
-                              _addBandCard(
-                            context,
-                          ),
-                        );
-                      }
+          if (!snapshot.hasData ||
+              snapshot.data!.docs.isEmpty) {
+            return ListView(
+              children: [
+                const Center(
+                  child: Padding(
+                    padding:
+                        EdgeInsets.all(20),
+                    child: Text(
+                      "No bands added yet",
+                    ),
+                  ),
+                ),
+                _addBandCard(context),
+              ],
+            );
+          }
 
-                      final band =
-                          bands[index]
-                                  .data()
-                              as Map<String,
-                                  dynamic>;
+          final bands =
+              snapshot.data!.docs;
 
-                      return Padding(
-                        padding:
-                            const EdgeInsets
-                                .only(
-                          bottom: 12,
-                        ),
-                        child: _bandCard(
-                          name:
-                              band['wearerName'] ??
-                                  '',
-                          bpm:
-                              '${band['heartRate'] ?? 0}',
-                          steps:
-                              '${band['steps'] ?? 0}',
-                          bandName:
-                              band['bandName'] ??
-                                  '',
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
+          return ListView.builder(
+            itemCount:
+                bands.length + 1,
+            itemBuilder:
+                (context, index) {
+
+              if (index ==
+                  bands.length) {
+                return Padding(
+                  padding:
+                      const EdgeInsets.only(
+                    top: 12,
+                  ),
+                  child:
+                      _addBandCard(
+                    context,
+                  ),
+                );
+              }
+
+              final band =
+                  bands[index].data()
+                      as Map<String,
+                          dynamic>;
+
+              return Padding(
+                padding:
+                    const EdgeInsets.only(
+                  bottom: 12,
+                ),
+                child: _bandCard(
+                  name:
+                      band['wearerName'] ??
+                          '',
+                  bpm:
+                      '${band['heartRate'] ?? 0}',
+                  steps:
+                      '${band['steps'] ?? 0}',
+                  bandName:
+                      band['bandName'] ??
+                          '',
+                ),
+              );
+            },
+          );
+        },
+      );
+    },
+  ),
+),
           ],
         ),
       ),
-
+                
       bottomNavigationBar: BottomNavigationBar(
   currentIndex: 0,
 
@@ -323,7 +336,7 @@ class DashboardScreen extends StatelessWidget {
     ),
   );
 }
-}
+
 Widget _addBandCard(
   BuildContext context,
 ) {
@@ -359,4 +372,5 @@ Widget _addBandCard(
       ),
     ),
   );
+}
 }
