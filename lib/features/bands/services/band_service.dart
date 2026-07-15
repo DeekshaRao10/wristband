@@ -30,4 +30,32 @@ class BandService {
           FieldValue.serverTimestamp(),
     });
   }
+
+  Future<void> createBand({
+    required String bandName,
+    required String wearerName,
+    required int age,
+    required String address,
+    required String bloodGroup,
+    required String medicalConditions,
+    required String doctorPhone,
+  }) async {
+    final user = auth.currentUser!;
+
+    await firestore.collection('bands').add({
+      'ownerId': user.uid,
+      'bandName': bandName,
+      'wearerName': wearerName,
+      'age': age,
+      'address': address,
+      'bloodGroup': bloodGroup,
+      'medicalConditions':
+          medicalConditions,
+      'doctorPhone': doctorPhone,
+      'heartRate': 0,
+      'steps': 0,
+      'createdAt':
+          FieldValue.serverTimestamp(),
+    });
+  }
 }

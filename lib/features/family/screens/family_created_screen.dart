@@ -3,7 +3,8 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/primary_button.dart';
-import 'family_members_screen.dart';
+import '../../pairing/screens/pair_scan_screen.dart';
+import '../../bands/screens/dashboard_screen.dart';
 
 class FamilyCreatedScreen extends StatelessWidget {
   final String familyName;
@@ -84,7 +85,7 @@ class FamilyCreatedScreen extends StatelessWidget {
                   color: AppColors.white,
                   borderRadius:
                       BorderRadius.circular(20),
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
                       color: Colors.black12,
                       blurRadius: 8,
@@ -118,6 +119,7 @@ class FamilyCreatedScreen extends StatelessWidget {
 
               const SizedBox(height: 24),
 
+              // SHARE CODE
               PrimaryButton(
                 text: "Share Code",
                 onPressed: _shareCode,
@@ -125,33 +127,39 @@ class FamilyCreatedScreen extends StatelessWidget {
 
               const SizedBox(height: 12),
 
-              OutlinedButton(
-                onPressed: _shareCode,
-                style: OutlinedButton.styleFrom(
-                  minimumSize:
-                      const Size(double.infinity, 52),
-                ),
-                child: const Text(
-                  "Invite Members",
-                ),
-              ),
-
-              const Spacer(),
-
+              // ADD BAND
               PrimaryButton(
-                text: "Continue",
+                text: "Add a Band",
                 onPressed: () {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
                       builder: (_) =>
-                          FamilyMembersScreen(
-                        familyName: familyName,
-                        inviteCode: inviteCode,
-                      ),
+                          const PairScanScreen(),
                     ),
                   );
                 },
+              ),
+
+              const Spacer(),
+
+              // GO HOME
+              TextButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          const DashboardScreen(),
+                    ),
+                  );
+                },
+                child: const Text(
+                  "Go to Home",
+                  style: TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
               ),
 
               const SizedBox(height: 12),

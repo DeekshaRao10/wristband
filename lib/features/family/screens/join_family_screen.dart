@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:pinput/pinput.dart';
+
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../services/family_service.dart';
 import '../../pairing/screens/pair_scan_screen.dart';
+import '../../bands/screens/dashboard_screen.dart';
 
 class JoinFamilyScreen extends StatefulWidget {
   const JoinFamilyScreen({super.key});
@@ -15,6 +17,7 @@ class JoinFamilyScreen extends StatefulWidget {
 
 class _JoinFamilyScreenState
     extends State<JoinFamilyScreen> {
+
   final TextEditingController codeController =
       TextEditingController();
 
@@ -53,69 +56,61 @@ class _JoinFamilyScreenState
       );
     }
   }
-
-  void showBandDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.circular(20),
-        ),
-        title: const Text(
-          "Do you have a SafeBand?",
-          textAlign: TextAlign.center,
-        ),
-        content: Text(
-          "You joined ${familyData!['familyName']}.\n\nWould you like to pair your band now?",
-          textAlign: TextAlign.center,
-        ),
-        actionsAlignment:
-            MainAxisAlignment.center,
-        actions: [
-          OutlinedButton(
-            onPressed: () {
-              Navigator.pop(context);
-
-              // TODO:
-              // Navigate to Dashboard Screen
-
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    "Go to Dashboard",
-                  ),
-                ),
-              );
-            },
-            child: const Text("No"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-
-              // TODO:
-              // Navigate to Pair Band Screen
-
-              Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (_) =>
-        const PairScanScreen(),
-  ),
-);
-              
-            },
-            child: const Text("Yes"),
-          ),
-        ],
+void showBandDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
       ),
-    );
-  }
 
-  @override
+      title: const Text(
+        "Do you have a SafeBand?",
+        textAlign: TextAlign.center,
+      ),
+
+      content: Text(
+        "You joined ${familyData!['familyName']}.\n\nWould you like to pair your band now?",
+        textAlign: TextAlign.center,
+      ),
+
+      actionsAlignment: MainAxisAlignment.center,
+
+      actions: [
+        OutlinedButton(
+          onPressed: () {
+            Navigator.pop(dialogContext);
+
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    const DashboardScreen(),
+              ),
+            );
+          },
+          child: const Text("No"),
+        ),
+
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(dialogContext);
+
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    const PairScanScreen(),
+              ),
+            );
+          },
+          child: const Text("Yes"),
+        ),
+      ],
+    ),
+  );
+}  @override
   Widget build(BuildContext context) {
     final defaultPinTheme = PinTheme(
       width: 50,
@@ -127,8 +122,7 @@ class _JoinFamilyScreenState
       ),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius:
-            BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: AppColors.primary,
         ),
@@ -145,6 +139,7 @@ class _JoinFamilyScreenState
 
       body: Padding(
         padding: const EdgeInsets.all(24),
+
         child: Column(
           children: [
             const SizedBox(height: 20),
@@ -174,8 +169,7 @@ class _JoinFamilyScreenState
               controller: codeController,
               length: 6,
               defaultPinTheme: defaultPinTheme,
-              keyboardType:
-                  TextInputType.number,
+              keyboardType: TextInputType.number,
               onCompleted: (value) {
                 searchFamily();
               },
@@ -188,14 +182,11 @@ class _JoinFamilyScreenState
 
             if (familyData != null)
               Container(
-                padding:
-                    const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   borderRadius:
-                      BorderRadius.circular(
-                    18,
-                  ),
+                      BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black
@@ -221,22 +212,18 @@ class _JoinFamilyScreenState
                     Expanded(
                       child: Column(
                         crossAxisAlignment:
-                            CrossAxisAlignment
-                                .start,
+                            CrossAxisAlignment.start,
                         children: [
                           const Text(
                             "You're joining",
                             style: TextStyle(
-                              color:
-                                  AppColors.grey,
+                              color: AppColors.grey,
                             ),
                           ),
 
                           Text(
-                            familyData![
-                                'familyName'],
-                            style:
-                                const TextStyle(
+                            familyData!['familyName'],
+                            style: const TextStyle(
                               fontSize: 20,
                               fontWeight:
                                   FontWeight.bold,
@@ -246,8 +233,7 @@ class _JoinFamilyScreenState
                           const Text(
                             "Family",
                             style: TextStyle(
-                              color:
-                                  AppColors.grey,
+                              color: AppColors.grey,
                             ),
                           ),
                         ],
@@ -260,28 +246,29 @@ class _JoinFamilyScreenState
             const Spacer(),
 
             if (familyData != null)
-             PrimaryButton(
-  text: "Confirm",
-  onPressed: () async {
-    try {
-      await FamilyService().joinFamily(
-        codeController.text.trim(),
-      );
+              PrimaryButton(
+                text: "Confirm",
+                onPressed: () async {
+                  try {
+                    await FamilyService()
+                        .joinFamily(
+                      codeController.text.trim(),
+                    );
 
-      if (!mounted) return;
+                    if (!mounted) return;
 
-      showBandDialog();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString(),
-          ),
-        ),
-      );
-    }
-  },
-),
+                    showBandDialog();
+                  } catch (e) {
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(
+                      SnackBar(
+                        content:
+                            Text(e.toString()),
+                      ),
+                    );
+                  }
+                },
+              ),
           ],
         ),
       ),

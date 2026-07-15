@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/primary_button.dart';
 import 'dart:io';
+import '../../bands/screens/dashboard_screen.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../bands/services/band_service.dart';
 
 class PairSetupScreen extends StatefulWidget {
   const PairSetupScreen({super.key});
@@ -67,8 +69,8 @@ final ImagePicker picker = ImagePicker();
   }
 }
 
-  void finishSetup() {
-    if (wifiController.text.trim().isEmpty ||
+Future<void> finishSetup() async {
+      if (wifiController.text.trim().isEmpty ||
         wifiPasswordController.text.trim().isEmpty ||
         fullNameController.text.trim().isEmpty ||
         ageController.text.trim().isEmpty ||
@@ -88,6 +90,39 @@ final ImagePicker picker = ImagePicker();
 
       return;
     }
+    await BandService().createBand(
+  bandName:
+      bandNameController.text.trim(),
+
+  wearerName:
+      fullNameController.text.trim(),
+
+  age: int.parse(
+    ageController.text.trim(),
+  ),
+
+  address:
+      addressController.text.trim(),
+
+  bloodGroup:
+      selectedBloodGroup!,
+
+  medicalConditions:
+      medicalController.text.trim(),
+
+  doctorPhone:
+      doctorPhoneController.text.trim(),
+);
+
+if (!mounted) return;
+
+Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(
+    builder: (_) =>
+        const DashboardScreen(),
+  ),
+);
 
     if (selectedWearer == "new") {
       if (emailController.text.trim().isEmpty ||
@@ -108,10 +143,13 @@ final ImagePicker picker = ImagePicker();
       }
     }
 
-    Navigator.pushReplacementNamed(
-      context,
-      '/dashboard',
-    );
+    Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(
+    builder: (_) =>
+        const DashboardScreen(),
+  ),
+);
   }
 
   @override

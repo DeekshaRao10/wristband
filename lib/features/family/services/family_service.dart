@@ -14,33 +14,69 @@ class FamilyService {
   String generateInviteCode() {
     final random = Random();
 
-    return (100000 + random.nextInt(900000))
+    return (100000 +
+            random.nextInt(900000))
         .toString();
   }
 
-  // Create Family
-  Future<Map<String, String>> createFamily(
+  // CREATE FAMILY
+  Future<Map<String, String>>
+      createFamily(
     String familyName,
   ) async {
     final user = _auth.currentUser;
 
     if (user == null) {
-      throw Exception("User not logged in");
+      throw Exception(
+        "User not logged in",
+      );
     }
 
-    final inviteCode = generateInviteCode();
+    final inviteCode =
+        generateInviteCode();
 
     final doc =
-        _firestore.collection('families').doc();
+        _firestore.collection(
+          'families',
+        ).doc();
 
     await doc.set({
       'familyId': doc.id,
       'familyName': familyName,
       'inviteCode': inviteCode,
       'createdBy': user.uid,
-'createdAt':
-FieldValue.serverTimestamp(),
+      'createdAt':
+          FieldValue.serverTimestamp(),
     });
+
+    // Save familyId in user document
+    await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .update({
+      'familyId': doc.id,
+    });
+
+    // Add creator as first member
+    final userDoc = await _firestore
+    .collection('users')
+    .doc(user.uid)
+    .get();
+
+await _firestore
+    .collection('families')
+    .doc(doc.id)
+    .collection('members')
+    .doc(user.uid)
+    .set({
+  'uid': user.uid,
+  'name': userDoc.data()?['name'] ?? '',
+  'email': userDoc.data()?['email'] ?? '',
+  'role': 'Admin',
+'familyId': doc.id,
+  'joinedAt':
+      FieldValue.serverTimestamp(),
+});
 
     return {
       'familyId': doc.id,
@@ -48,17 +84,19 @@ FieldValue.serverTimestamp(),
     };
   }
 
-  // Find Family By Invite Code
-  Future<Map<String, dynamic>?> getFamilyByCode(
+  // FIND FAMILY BY INVITE CODE
+  Future<Map<String, dynamic>?>
+      getFamilyByCode(
     String inviteCode,
   ) async {
-    final result = await _firestore
-        .collection('families')
-        .where(
-          'inviteCode',
-          isEqualTo: inviteCode,
-        )
-        .get();
+    final result =
+        await _firestore
+            .collection('families')
+            .where(
+              'inviteCode',
+              isEqualTo: inviteCode,
+            )
+            .get();
 
     if (result.docs.isEmpty) {
       return null;
@@ -67,24 +105,67 @@ FieldValue.serverTimestamp(),
     return result.docs.first.data();
   }
 
-  // Join Family
+  // JOIN FAMILY USING INVITE CODE
   Future<void> joinFamily(
-    String familyId,
-  ) async {
-    final user = _auth.currentUser;
+  String inviteCode,
+) async {
+  final user = _auth.currentUser;
 
-    if (user == null) {
-      throw Exception("User not logged in");
-    }
-
-    await _firestore
-        .collection('families')
-        .doc(familyId)
-        .collection('members')
-        .doc(user.uid)
-        .set({
-      'uid': user.uid,
-'joinedAt':
-FieldValue.serverTimestamp(),    });
+  if (user == null) {
+    throw Exception(
+      "User not logged in",
+    );
   }
+
+  final familyQuery =
+      await _firestore
+          .collection('families')
+          .where(
+            'inviteCode',
+            isEqualTo: inviteCode,
+          )
+          .get();
+
+  if (familyQuery.docs.isEmpty) {
+    throw Exception(
+      "Invalid Invite Code",
+    );
+  }
+
+  final familyDoc =
+      familyQuery.docs.first;
+
+  final familyId =
+      familyDoc.id;
+
+  final userDoc =
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+  await _firestore
+      .collection('families')
+      .doc(familyId)
+      .collection('members')
+      .doc(user.uid)
+      .set({
+    'uid': user.uid,
+    'name':
+        userDoc.data()?['name'] ?? '',
+    'email':
+        userDoc.data()?['email'] ?? '',
+    'role': 'Member',
+    'familyId': familyId,
+    'joinedAt':
+        FieldValue.serverTimestamp(),
+  });
+
+  await _firestore
+      .collection('users')
+      .doc(user.uid)
+      .update({
+    'familyId': familyId,
+  });
+}
 }

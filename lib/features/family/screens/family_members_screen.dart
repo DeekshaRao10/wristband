@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -5,11 +6,13 @@ import '../../../core/widgets/primary_button.dart';
 import '../../pairing/screens/pair_scan_screen.dart';
 
 class FamilyMembersScreen extends StatelessWidget {
+  final String familyId;
   final String familyName;
   final String inviteCode;
 
   const FamilyMembersScreen({
     super.key,
+    required this.familyId,
     required this.familyName,
     required this.inviteCode,
   });
@@ -95,13 +98,66 @@ class FamilyMembersScreen extends StatelessWidget {
             const SizedBox(height: 15),
 
             Expanded(
-              child: ListView(
-                children: const [
-                  _MemberCard(
-                    name: "You",
-                    role: "Admin",
-                  ),
-                ],
+              child:
+                  StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore
+                    .instance
+                    .collection('families')
+                    .doc(familyId)
+                    .collection('members')
+                    .snapshots(),
+
+                builder:
+                    (context, snapshot) {
+                  if (snapshot
+                          .connectionState ==
+                      ConnectionState
+                          .waiting) {
+                    return const Center(
+                      child:
+                          CircularProgressIndicator(),
+                    );
+                  }
+
+                  if (!snapshot.hasData ||
+                      snapshot
+                          .data!
+                          .docs
+                          .isEmpty) {
+                    return const Center(
+                      child: Text(
+                        "No family members found",
+                      ),
+                    );
+                  }
+
+                  final members =
+                      snapshot.data!.docs;
+
+                  return ListView.builder(
+                    itemCount:
+                        members.length,
+
+                    itemBuilder:
+                        (context, index) {
+                      final member =
+                          members[index]
+                                  .data()
+                              as Map<String,
+                                  dynamic>;
+
+                      return _MemberCard(
+                        name:
+                            member['name'] ??
+                                'Unknown',
+
+                        role:
+                            member['role'] ??
+                                'Member',
+                      );
+                    },
+                  );
+                },
               ),
             ),
 
@@ -137,8 +193,12 @@ class _MemberCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin:
-          const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+          const EdgeInsets.only(
+        bottom: 12,
+      ),
+
+      padding:
+          const EdgeInsets.all(16),
 
       decoration: BoxDecoration(
         color: AppColors.white,
