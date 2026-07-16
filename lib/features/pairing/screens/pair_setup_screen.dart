@@ -7,12 +7,20 @@ import '../../bands/screens/dashboard_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../bands/services/band_service.dart';
 
-class PairSetupScreen extends StatefulWidget {
-  const PairSetupScreen({super.key});
+class PairSetupScreen
+    extends StatefulWidget {
+
+  final String deviceId;
+
+  const PairSetupScreen({
+    super.key,
+    required this.deviceId,
+  });
 
   @override
-  State<PairSetupScreen> createState() =>
-      _PairSetupScreenState();
+  State<PairSetupScreen>
+      createState() =>
+          _PairSetupScreenState();
 }
 
 class _PairSetupScreenState
@@ -90,7 +98,9 @@ Future<void> finishSetup() async {
 
       return;
     }
-    await BandService().createBand(
+   await BandService().createBand(
+  deviceId: widget.deviceId,
+
   bandName:
       bandNameController.text.trim(),
 
@@ -113,7 +123,6 @@ Future<void> finishSetup() async {
   doctorPhone:
       doctorPhoneController.text.trim(),
 );
-
 if (!mounted) return;
 
 Navigator.pushReplacement(

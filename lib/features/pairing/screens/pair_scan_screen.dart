@@ -69,6 +69,10 @@ class _PairScanScreenState
   ) async {
     try {
       await device.connect();
+      print(
+  "Connected Device ID: "
+  "${device.remoteId.str}",
+);
 
       if (!mounted) return;
 
@@ -87,11 +91,13 @@ await Future.delayed(
 );
 
 if (!mounted) return;
-
 Navigator.pushReplacement(
   context,
   MaterialPageRoute(
-    builder: (_) => PairSetupScreen(),
+    builder: (_) => PairSetupScreen(
+      deviceId:
+          device.remoteId.str,
+    ),
   ),
 );
       // NEXT STEP:

@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 class BandService {
   final FirebaseFirestore firestore =
       FirebaseFirestore.instance;
@@ -31,15 +30,16 @@ class BandService {
     });
   }
 
-  Future<void> createBand({
-    required String bandName,
-    required String wearerName,
-    required int age,
-    required String address,
-    required String bloodGroup,
-    required String medicalConditions,
-    required String doctorPhone,
-  }) async {
+   Future<void> createBand({
+  required String deviceId,
+  required String bandName,
+  required String wearerName,
+  required int age,
+  required String address,
+  required String bloodGroup,
+  required String medicalConditions,
+  required String doctorPhone,
+}) async {
     final user = auth.currentUser!;
 
     // Get current user's familyId
@@ -52,6 +52,8 @@ class BandService {
         userDoc.data()?['familyId'];
 
     await firestore.collection('bands').add({
+            'deviceId': deviceId,
+
       'ownerId': user.uid,
 
       // IMPORTANT
