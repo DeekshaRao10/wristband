@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../services/bluetooth_service.dart';
 import '../widgets/device_tile.dart';
 import 'pair_setup_screen.dart';
+import '../services/bluetooth_device_manager.dart';
 
 class PairScanScreen extends StatefulWidget {
   const PairScanScreen({super.key});
@@ -69,6 +70,8 @@ class _PairScanScreenState
   ) async {
     try {
       await device.connect();
+      BluetoothDeviceManager.connectedDevice =
+    device;
       print(
   "Connected Device ID: "
   "${device.remoteId.str}",

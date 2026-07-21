@@ -1,11 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-class BandService {
-  final FirebaseFirestore firestore =
-      FirebaseFirestore.instance;
+import 'package:firebase_core/firebase_core.dart';
 
-  final FirebaseAuth auth =
-      FirebaseAuth.instance;
+import '../../../firebase_options.dart';
+
+class BandService {
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  final FirebaseAuth auth = FirebaseAuth.instance;
 
   Future<void> createWearer({
     required String name,
@@ -25,55 +26,123 @@ class BandService {
       'email': email,
       'address': address,
       'photoUrl': '',
-      'createdAt':
-          FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
     });
   }
 
-   Future<void> createBand({
-  required String deviceId,
-  required String bandName,
-  required String wearerName,
-  required int age,
-  required String address,
-  required String bloodGroup,
-  required String medicalConditions,
-  required String doctorPhone,
-}) async {
+  Future<void> createBand({
+    required String deviceId,
+    required String bandName,
+    required String wearerName,
+    required int age,
+    required String address,
+    required String bloodGroup,
+    required String medicalConditions,
+    required String doctorPhone,
+
+    String? wearerEmail,
+    String? wearerPassword,
+  }) async {
     final user = auth.currentUser!;
 
-    // Get current user's familyId
-    final userDoc = await firestore
-        .collection('users')
-        .doc(user.uid)
+    // Get owner's familyId
+    final userDoc =
+        await firestore.collection('users').doc(user.uid).get();
+
+    final familyId = userDoc.data()?['familyId'];
+
+    // Check if band already exists
+    final existingBand = await firestore
+        .collection('bands')
+        .where('deviceId', isEqualTo: deviceId)
+        .limit(1)
         .get();
 
-    final familyId =
-        userDoc.data()?['familyId'];
+    if (existingBand.docs.isNotEmpty) {
+      throw Exception("This band is already registered.");
+    }
 
-    await firestore.collection('bands').add({
-            'deviceId': deviceId,
-
+    // Create band
+    final bandRef = await firestore.collection('bands').add({
+      'deviceId': deviceId,
       'ownerId': user.uid,
-
-      // IMPORTANT
       'familyId': familyId,
-
       'bandName': bandName,
       'wearerName': wearerName,
       'age': age,
       'address': address,
       'bloodGroup': bloodGroup,
-      'medicalConditions':
-          medicalConditions,
+      'medicalConditions': medicalConditions,
       'doctorPhone': doctorPhone,
-
-      // Dummy values for now
       'heartRate': 0,
       'steps': 0,
-
-      'createdAt':
-          FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
     });
+
+    // Add OWNER
+    await firestore.collection('bandMembers').add({
+      'bandId': bandRef.id,
+      'userId': user.uid,
+      'role': 'OWNER',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    // Create WEARER account (optional)
+    if (wearerEmail != null &&
+        wearerPassword != null &&
+        wearerEmail.isNotEmpty &&
+        wearerPassword.isNotEmpty) {
+      FirebaseApp secondaryApp;
+
+      try {
+        try {
+          secondaryApp = Firebase.app('WearerApp');
+        } catch (_) {
+          secondaryApp = await Firebase.initializeApp(
+            name: 'WearerApp',
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+        }
+
+        final secondaryAuth =
+            FirebaseAuth.instanceFor(app: secondaryApp);
+
+        final wearerCredential =
+            await secondaryAuth.createUserWithEmailAndPassword(
+          email: wearerEmail,
+          password: wearerPassword,
+        );
+
+        final wearerUid = wearerCredential.user!.uid;
+
+        // ============================
+        // CREATE USERS DOCUMENT
+        // ============================
+        await firestore
+            .collection('users')
+            .doc(wearerUid)
+            .set({
+          'email': wearerEmail,
+          'familyId': familyId,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        // ============================
+        // ADD BAND MEMBER
+        // ============================
+        await firestore.collection('bandMembers').add({
+          'bandId': bandRef.id,
+          'userId': wearerUid,
+          'role': 'WEARER',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        await secondaryAuth.signOut();
+      } catch (e) {
+        // Roll back the band if wearer creation fails
+        await bandRef.delete();
+        rethrow;
+      }
+    }
   }
 }

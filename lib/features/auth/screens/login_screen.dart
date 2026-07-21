@@ -9,6 +9,8 @@ import '../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import '../../family/screens/family_choice_screen.dart';
+import '../../bands/screens/dashboard_screen.dart'; 
+import '../../bands/services/role_service.dart';
 
 class LoginScreen extends StatelessWidget {
   LoginScreen({super.key});
@@ -84,56 +86,91 @@ class LoginScreen extends StatelessWidget {
               const SizedBox(height: 10),
 
               Align(
-  alignment: Alignment.centerRight,
-  child: TextButton(
-    onPressed: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ForgotPasswordScreen(),
-        ),
-      );
-    },
-    child: const Text(
-      "Forgot Password?",
-      style: TextStyle(
-        color: AppColors.primary,
-      ),
-    ),
-  ),
-),
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ForgotPasswordScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    "Forgot Password?",
+                    style: TextStyle(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
 
               const SizedBox(height: 20),
 
               PrimaryButton(
-                text: "Login",
-                onPressed: () async {
-                  try {
-                    await AuthService().login(
-                      email: emailController.text.trim(),
-                      password: passwordController.text.trim(),
-                    );
+  text: "Login",
+  onPressed: () async {
+    try {
+      // Login user
+      await AuthService().login(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
 
-                   if (context.mounted) {
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const FamilyChoiceScreen(),
-    ),
-  );
-}
-                    
-                  } on FirebaseAuthException {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          "Invalid email or password",
-                        ),
-                      ),
-                    );
-                  }
-                },
-              ),
+      // Check if user belongs to a band
+      final membership =
+          await RoleService().getCurrentMembership();
+
+      // --------------------------------------
+      // First-time user (no band paired yet)
+      // --------------------------------------
+      if (membership == null) {
+        if (context.mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const FamilyChoiceScreen(),
+            ),
+          );
+        }
+        return;
+      }
+
+      // --------------------------------------
+      // Existing user
+      // --------------------------------------
+      final String role = membership['role'];
+      final String bandId = membership['bandId'];
+
+      debugPrint("Role : $role");
+      debugPrint("Band ID : $bandId");
+
+      // OWNER / WEARER / FAMILY
+      if (context.mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const DashboardScreen(),
+          ),
+        );
+      }
+    } on FirebaseAuthException {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Invalid email or password",
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+        ),
+      );
+    }
+  },
+),
 
               const SizedBox(height: 20),
 

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../pairing/screens/pair_scan_screen.dart';
 import '../../family/screens/family_members_screen.dart';
-
+import 'band_detail_screen.dart';
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
@@ -141,18 +141,14 @@ class DashboardScreen extends StatelessWidget {
                     const EdgeInsets.only(
                   bottom: 12,
                 ),
-                child: _bandCard(
-                  name:
-                      band['wearerName'] ??
-                          '',
-                  bpm:
-                      '${band['heartRate'] ?? 0}',
-                  steps:
-                      '${band['steps'] ?? 0}',
-                  bandName:
-                      band['bandName'] ??
-                          '',
-                ),
+               child: _bandCard(
+  context: context,
+  bandId: bands[index].id,
+  name: band['wearerName'] ?? '',
+  bpm: '${band['heartRate'] ?? 0}',
+  steps: '${band['steps'] ?? 0}',
+  bandName: band['bandName'] ?? '',
+),
               );
             },
           );
@@ -230,113 +226,138 @@ class DashboardScreen extends StatelessWidget {
     );
   }
  Widget _bandCard({
+  required BuildContext context,
+  required String bandId,
   required String name,
   required String bpm,
   required String steps,
   required String bandName,
 }) {
-  return Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 25,
-                child: Icon(Icons.person),
-              ),
+  return GestureDetector(
+    onTap: () {
 
-              const SizedBox(width: 12),
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BandDetailScreen(
+            bandId: bandId,
+          ),
+        ),
+      );
 
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight:
-                            FontWeight.bold,
+    },
+
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+
+            Row(
+              children: [
+
+                const CircleAvatar(
+                  radius: 25,
+                  child: Icon(Icons.person),
+                ),
+
+                const SizedBox(width: 12),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
 
-                    Text(
-                      bandName,
-                      style: const TextStyle(
+                      Text(
+                        bandName,
+                        style: const TextStyle(
+                          color: Colors.grey,
+                        ),
+                      ),
+
+                    ],
+                  ),
+                ),
+
+              ],
+            ),
+
+            const SizedBox(height: 15),
+
+            Row(
+              children: [
+
+                Expanded(
+                  child: Container(
+                    padding:
+                        const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      borderRadius:
+                          BorderRadius.circular(12),
+                      border: Border.all(
                         color: Colors.grey,
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+                    child: Column(
+                      children: [
 
-          const SizedBox(height: 15),
+                        const Icon(
+                          Icons.favorite,
+                          color: Colors.red,
+                        ),
 
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding:
-                      const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    borderRadius:
-                        BorderRadius.circular(
-                      12,
-                    ),
-                    border: Border.all(
-                      color: Colors.grey,
+                        Text("$bpm BPM"),
+
+                      ],
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      const Icon(
-                        Icons.favorite,
-                        color: Colors.red,
+                ),
+
+                const SizedBox(width: 12),
+
+                Expanded(
+                  child: Container(
+                    padding:
+                        const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      borderRadius:
+                          BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.grey,
                       ),
-                      Text("$bpm BPM"),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              Expanded(
-                child: Container(
-                  padding:
-                      const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    borderRadius:
-                        BorderRadius.circular(
-                      12,
                     ),
-                    border: Border.all(
-                      color: Colors.grey,
+                    child: Column(
+                      children: [
+
+                        const Icon(
+                          Icons.directions_walk,
+                        ),
+
+                        Text(steps),
+
+                      ],
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      const Icon(
-                        Icons.directions_walk,
-                      ),
-                      Text(steps),
-                    ],
-                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+
+              ],
+            ),
+
+          ],
+        ),
       ),
     ),
   );
 }
-
 Widget _addBandCard(
   BuildContext context,
 ) {

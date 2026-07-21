@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/primary_button.dart';
-import 'dart:io';
 import '../../bands/screens/dashboard_screen.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../bands/services/band_service.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import '../services/bluetooth_device_manager.dart';
+import '../services/wifi_scan_service.dart';
 
-class PairSetupScreen
-    extends StatefulWidget {
 
+class PairSetupScreen extends StatefulWidget {
   final String deviceId;
 
   const PairSetupScreen({
@@ -18,11 +21,9 @@ class PairSetupScreen
   });
 
   @override
-  State<PairSetupScreen>
-      createState() =>
-          _PairSetupScreenState();
+  State<PairSetupScreen> createState() =>
+      _PairSetupScreenState();
 }
-
 class _PairSetupScreenState
     extends State<PairSetupScreen> {
 
@@ -31,9 +32,15 @@ class _PairSetupScreenState
   bool showProfileForm = false;
 
   String? selectedBloodGroup;
+
   File? profileImage;
 
-final ImagePicker picker = ImagePicker();
+  List<String> wifiNetworks = [];
+
+  String? selectedWifi;
+
+  final ImagePicker picker =
+      ImagePicker();
 
   final wifiController =
       TextEditingController();
@@ -64,103 +71,160 @@ final ImagePicker picker = ImagePicker();
 
   final bandNameController =
       TextEditingController();
-      Future<void> pickProfileImage() async {
+
+@override
+void initState() {
+  super.initState();
+
+  loadWifiNetworks();
+}
+
+Future<void> pickProfileImage() async {
   final XFile? image =
       await picker.pickImage(
     source: ImageSource.gallery,
   );
-
-  if (image != null) {
+   if (image != null) {
     setState(() {
-      profileImage = File(image.path);
+      profileImage =
+          File(image.path);
     });
   }
 }
 
-Future<void> finishSetup() async {
-      if (wifiController.text.trim().isEmpty ||
-        wifiPasswordController.text.trim().isEmpty ||
-        fullNameController.text.trim().isEmpty ||
-        ageController.text.trim().isEmpty ||
-        addressController.text.trim().isEmpty ||
-        selectedBloodGroup == null ||
-        medicalController.text.trim().isEmpty ||
-        bandNameController.text.trim().isEmpty) {
+  
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+Future<void> loadWifiNetworks() async {
+
+  final device =
+      BluetoothDeviceManager
+          .connectedDevice;
+
+  if (device == null) return;
+
+  final wifiList =
+      await WifiScanService()
+          .getWifiList(device);
+
+setState(() {
+  wifiNetworks = wifiList
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toSet()
+      .toList();
+
+  if (!wifiNetworks.contains(selectedWifi)) {
+    selectedWifi = null;
+  }
+});
+}
+
+Future<void> finishSetup() async {
+  // Common required fields
+  if (selectedWifi == null ||
+      wifiPasswordController.text.trim().isEmpty ||
+      fullNameController.text.trim().isEmpty ||
+      ageController.text.trim().isEmpty ||
+      addressController.text.trim().isEmpty ||
+      selectedBloodGroup == null ||
+      medicalController.text.trim().isEmpty ||
+      bandNameController.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Required field is missing"),
+      ),
+    );
+    return;
+  }
+
+  // Additional validation for "New Profile"
+  if (selectedWearer == "new") {
+    if (emailController.text.trim().isEmpty ||
+        userPasswordController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            "Required field is missing",
+            "Wearer email and password are required",
           ),
         ),
       );
-
       return;
     }
-   await BandService().createBand(
-  deviceId: widget.deviceId,
-
-  bandName:
-      bandNameController.text.trim(),
-
-  wearerName:
-      fullNameController.text.trim(),
-
-  age: int.parse(
-    ageController.text.trim(),
-  ),
-
-  address:
-      addressController.text.trim(),
-
-  bloodGroup:
-      selectedBloodGroup!,
-
-  medicalConditions:
-      medicalController.text.trim(),
-
-  doctorPhone:
-      doctorPhoneController.text.trim(),
-);
-if (!mounted) return;
-
-Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(
-    builder: (_) =>
-        const DashboardScreen(),
-  ),
-);
-
-    if (selectedWearer == "new") {
-      if (emailController.text.trim().isEmpty ||
-          userPasswordController.text
-              .trim()
-              .isEmpty) {
-
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Required field is missing",
-            ),
-          ),
-        );
-
-        return;
-      }
-    }
-
-    Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(
-    builder: (_) =>
-        const DashboardScreen(),
-  ),
-);
   }
 
+  final device = BluetoothDeviceManager.connectedDevice;
+
+  if (device == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Band not connected"),
+      ),
+    );
+    return;
+  }
+
+  bool sent = await WifiScanService().sendWifiCredentials(
+    device,
+    selectedWifi!,
+    wifiPasswordController.text.trim(),
+  );
+
+  if (!sent) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Failed to send WiFi credentials"),
+      ),
+    );
+    return;
+  }
+
+  try {
+    if (selectedWearer == "new") {
+      await BandService().createBand(
+        deviceId: widget.deviceId,
+        bandName: bandNameController.text.trim(),
+        wearerName: fullNameController.text.trim(),
+        age: int.parse(ageController.text.trim()),
+        address: addressController.text.trim(),
+        bloodGroup: selectedBloodGroup!,
+        medicalConditions: medicalController.text.trim(),
+        doctorPhone: doctorPhoneController.text.trim(),
+        wearerEmail: emailController.text.trim(),
+        wearerPassword: userPasswordController.text.trim(),
+      );
+    } else {
+      await BandService().createBand(
+        deviceId: widget.deviceId,
+        bandName: bandNameController.text.trim(),
+        wearerName: fullNameController.text.trim(),
+        age: int.parse(ageController.text.trim()),
+        address: addressController.text.trim(),
+        bloodGroup: selectedBloodGroup!,
+        medicalConditions: medicalController.text.trim(),
+        doctorPhone: doctorPhoneController.text.trim(),
+      );
+    }
+
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const DashboardScreen(),
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          e.toString().replaceFirst("Exception: ", ""),
+        ),
+      ),
+    );
+  }
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -239,17 +303,27 @@ Card(
 
         const SizedBox(height: 15),
 
-        TextField(
-          controller: wifiController,
-          decoration:
-              const InputDecoration(
-            labelText: "WiFi Network *",
-            border:
-                OutlineInputBorder(),
-          ),
-        ),
-
-        const SizedBox(height: 12),
+      
+DropdownButtonFormField<String>(
+  value: selectedWifi,
+hint: const Text("Select WiFi"),
+  decoration: const InputDecoration(
+    labelText: "Select WiFi",
+    border: OutlineInputBorder(),
+    prefixIcon: Icon(Icons.wifi),
+  ),
+  items: wifiNetworks.map((wifi) {
+    return DropdownMenuItem(
+      value: wifi,
+      child: Text(wifi),
+    );
+  }).toList(),
+  onChanged: (value) {
+    setState(() {
+      selectedWifi = value;
+    });
+  },
+),    const SizedBox(height: 12),
 
         TextField(
           controller:
