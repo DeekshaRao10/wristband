@@ -9,7 +9,7 @@ import '../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import '../../family/screens/family_choice_screen.dart';
-import '../../bands/screens/dashboard_screen.dart'; 
+import '../../bands/screens/dashboard_screen.dart';
 import '../../bands/services/role_service.dart';
 
 class LoginScreen extends StatelessWidget {
@@ -22,11 +22,9 @@ class LoginScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-
           child: Column(
             children: [
               const SizedBox(height: 60),
@@ -108,69 +106,81 @@ class LoginScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               PrimaryButton(
-  text: "Login",
-  onPressed: () async {
-    try {
-      // Login user
-      await AuthService().login(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
+                text: "Login",
+                onPressed: () async {
+                  // Validate empty fields
+                  if (emailController.text.trim().isEmpty ||
+                      passwordController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Please enter email and password.",
+                        ),
+                      ),
+                    );
+                    return;
+                  }
 
-      // Check if user belongs to a band
-      final membership =
-          await RoleService().getCurrentMembership();
+                  try {
+                    // Login user
+                    await AuthService().login(
+                      email: emailController.text.trim(),
+                      password: passwordController.text.trim(),
+                    );
 
-      // --------------------------------------
-      // First-time user (no band paired yet)
-      // --------------------------------------
-      if (membership == null) {
-        if (context.mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const FamilyChoiceScreen(),
-            ),
-          );
-        }
-        return;
-      }
+                    // Check if user belongs to a band
+                    final membership =
+                        await RoleService().getCurrentMembership();
 
-      // --------------------------------------
-      // Existing user
-      // --------------------------------------
-      final String role = membership['role'];
-      final String bandId = membership['bandId'];
+                    // First-time user
+                    if (membership == null) {
+                      if (context.mounted) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const FamilyChoiceScreen(),
+                          ),
+                        );
+                      }
+                      return;
+                    }
 
-      debugPrint("Role : $role");
-      debugPrint("Band ID : $bandId");
+                    // Existing user
+                    final String role = membership['role'];
+                    final String bandId = membership['bandId'];
 
-      // OWNER / WEARER / FAMILY
-      if (context.mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const DashboardScreen(),
-          ),
-        );
-      }
-    } on FirebaseAuthException {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Invalid email or password",
-          ),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-        ),
-      );
-    }
-  },
-),
+                    debugPrint("Role : $role");
+                    debugPrint("Band ID : $bandId");
+
+                    if (context.mounted) {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const DashboardScreen(),
+                        ),
+                      );
+                    }
+                  } on FirebaseAuthException {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Invalid email or password.",
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          e.toString(),
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
 
               const SizedBox(height: 20),
 

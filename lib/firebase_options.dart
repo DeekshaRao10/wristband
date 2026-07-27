@@ -49,13 +49,15 @@ class DefaultFirebaseOptions {
     storageBucket: 'safeband-a3b89.firebasestorage.app',
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAulmg9z_Bz_8sfevHW3ofLVyDGPoMNRtQ',
-    appId: '1:201645168726:android:d57a86880b6e9f1f9d03f7',
-    messagingSenderId: '201645168726',
-    projectId: 'safeband-a3b89',
-    storageBucket: 'safeband-a3b89.firebasestorage.app',
-  );
+ static const FirebaseOptions android = FirebaseOptions(
+  apiKey: 'AIzaSyAulmg9z_Bz_8sfevHW3ofLVyDGPoMNRtQ',
+  appId: '1:201645168726:android:d57a86880b6e9f1f9d03f7',
+  messagingSenderId: '201645168726',
+  projectId: 'safeband-a3b89',
+  storageBucket: 'safeband-a3b89.firebasestorage.app',
+  databaseURL:
+      'https://safeband-a3b89-default-rtdb.asia-southeast1.firebasedatabase.app',
+);
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAjTSMLksIYanD4PI8qFfe3FcyiOWRzC34',

@@ -39,10 +39,11 @@ class BandService {
     required String bloodGroup,
     required String medicalConditions,
     required String doctorPhone,
-
     String? wearerEmail,
     String? wearerPassword,
   }) async {
+    print("BandService: createBand() started");
+
     final user = auth.currentUser!;
 
     // Get owner's familyId
@@ -104,32 +105,35 @@ class BandService {
           );
         }
 
-        final secondaryAuth =
-            FirebaseAuth.instanceFor(app: secondaryApp);
+        print("==================================");
+print("Creating wearer Firebase account");
+print("Email: $wearerEmail");
+print("Password length: ${wearerPassword.length}");
 
-        final wearerCredential =
-            await secondaryAuth.createUserWithEmailAndPassword(
-          email: wearerEmail,
-          password: wearerPassword,
-        );
+final secondaryAuth =
+    FirebaseAuth.instanceFor(app: secondaryApp);
 
-        final wearerUid = wearerCredential.user!.uid;
+print("Calling createUserWithEmailAndPassword()...");
 
-        // ============================
-        // CREATE USERS DOCUMENT
-        // ============================
-        await firestore
-            .collection('users')
-            .doc(wearerUid)
-            .set({
+final wearerCredential =
+    await secondaryAuth.createUserWithEmailAndPassword(
+  email: wearerEmail,
+  password: wearerPassword,
+);
+
+print("Firebase Auth account created!");
+print("Wearer UID = ${wearerCredential.user!.uid}");
+
+final wearerUid = wearerCredential.user!.uid;
+        // Create wearer user document
+        await firestore.collection('users').doc(wearerUid).set({
+          'name': wearerName,
           'email': wearerEmail,
           'familyId': familyId,
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // ============================
-        // ADD BAND MEMBER
-        // ============================
+        // Add wearer to band
         await firestore.collection('bandMembers').add({
           'bandId': bandRef.id,
           'userId': wearerUid,
@@ -137,12 +141,49 @@ class BandService {
           'createdAt': FieldValue.serverTimestamp(),
         });
 
+        // Also add the wearer to the FAMILY's members subcollection — this
+        // was missing before, which meant a wearer created here would never
+        // show up in FamilyMembersScreen (which only reads
+        // families/{familyId}/members). Without this, only Admin/Member
+        // accounts created via family_service.dart's createFamily/joinFamily
+        // ever appeared in the members list.
+        if (familyId != null &&
+            familyId.toString().isNotEmpty) {
+          await firestore
+              .collection('families')
+              .doc(familyId)
+              .collection('members')
+              .doc(wearerUid)
+              .set({
+            'uid': wearerUid,
+            'name': wearerName,
+            'email': wearerEmail,
+            'role': 'Wearer',
+            'familyId': familyId,
+            'joinedAt': FieldValue.serverTimestamp(),
+          });
+        }
+
         await secondaryAuth.signOut();
-      } catch (e) {
-        // Roll back the band if wearer creation fails
-        await bandRef.delete();
-        rethrow;
-      }
-    }
+      } on FirebaseAuthException catch (e) {
+  print("==================================");
+  print("FirebaseAuthException");
+  print("Code: ${e.code}");
+  print("Message: ${e.message}");
+  print("==================================");
+
+  await bandRef.delete();
+  rethrow;
+} catch (e, st) {
+  print("==================================");
+  print("Unknown Exception");
+  print(e);
+  print(st);
+  print("==================================");
+
+  await bandRef.delete();
+  rethrow;
+}
+        }
   }
 }

@@ -1,26 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../services/bluetooth_service.dart';
+import '../services/bluetooth_device_manager.dart';
 import '../widgets/device_tile.dart';
 import 'pair_setup_screen.dart';
-import '../services/bluetooth_device_manager.dart';
 
 class PairScanScreen extends StatefulWidget {
   const PairScanScreen({super.key});
 
   @override
-  State<PairScanScreen> createState() =>
-      _PairScanScreenState();
+  State<PairScanScreen> createState() => _PairScanScreenState();
 }
 
-class _PairScanScreenState
-    extends State<PairScanScreen> {
+class _PairScanScreenState extends State<PairScanScreen> {
   final SafeBandBluetoothService bluetoothService =
-    SafeBandBluetoothService();
-  List<ScanResult> devices = [];
+      SafeBandBluetoothService();
 
+  List<ScanResult> devices = [];
   bool scanning = true;
 
   @override
@@ -29,90 +28,89 @@ class _PairScanScreenState
     startScan();
   }
 
+  Future<void> requestBlePermissions() async {
+    await [
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.location,
+    ].request();
+  }
+
   Future<void> startScan() async {
-    setState(() {
-      scanning = true;
-    });
+    print("START SCAN CALLED");
+
+    await requestBlePermissions();
+
+    if (mounted) {
+      setState(() {
+        scanning = true;
+        devices = [];
+      });
+    }
 
     await bluetoothService.startScan();
 
-    bluetoothService.scanResults.listen(
-  (results) {
+    bluetoothService.scanResults.listen((results) {
+      print("Total Devices: ${results.length}");
 
-    print("Total Devices: ${results.length}");
-
-    for (var r in results) {
-      print(
-        "Device: ${r.device.platformName} "
-        "RSSI: ${r.rssi}",
-      );
-    }
-
-    setState(() {
-      devices = results;
+      if (mounted) {
+        setState(() {
+          devices = results
+              .where(
+                (r) => r.device.platformName.isNotEmpty,
+              )
+              .toList();
+        });
+      }
     });
-  },
-);
 
-    await Future.delayed(
-      const Duration(seconds: 5),
-    );
+    await Future.delayed(const Duration(seconds: 5));
 
     await bluetoothService.stopScan();
 
-    setState(() {
-      scanning = false;
-    });
+    if (mounted) {
+      setState(() {
+        scanning = false;
+      });
+    }
   }
 
-  Future<void> connectDevice(
-    BluetoothDevice device,
-  ) async {
+  Future<void> connectDevice(BluetoothDevice device) async {
     try {
       await device.connect();
-      BluetoothDeviceManager.connectedDevice =
-    device;
-      print(
-  "Connected Device ID: "
-  "${device.remoteId.str}",
-);
+
+      BluetoothDeviceManager.connectedDevice = device;
+
+      print("Connected Device ID: ${device.remoteId.str}");
 
       if (!mounted) return;
 
-ScaffoldMessenger.of(context).showSnackBar(
-  SnackBar(
-    content: Text(
-      "${device.platformName} Connected Successfully",
-    ),
-    backgroundColor: Colors.green,
-    duration: const Duration(seconds: 2),
-  ),
-);
-
-await Future.delayed(
-  const Duration(seconds: 2),
-);
-
-if (!mounted) return;
-Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(
-    builder: (_) => PairSetupScreen(
-      deviceId:
-          device.remoteId.str,
-    ),
-  ),
-);
-      // NEXT STEP:
-      // Save Band ID in Firestore
-
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "Connection Failed",
+            "${device.platformName} Connected Successfully",
           ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PairSetupScreen(
+            deviceId: device.remoteId.str,
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Connection Failed"),
         ),
       );
     }
@@ -130,28 +128,22 @@ Navigator.pushReplacement(
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          AppColors.background,
-
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-  backgroundColor: AppColors.background,
-  elevation: 0,
-  title: const Text(
-    "Add your SafeBand",
-  ),
-  actions: [
-    IconButton(
-      icon: const Icon(Icons.refresh),
-      onPressed: () async {
-        await startScan();
-      },
-    ),
-  ],
-),
-
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        title: const Text("Add your SafeBand"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await startScan();
+            },
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(20),
-
         child: Column(
           children: [
             const SizedBox(height: 20),
@@ -165,13 +157,11 @@ Navigator.pushReplacement(
 
             CircleAvatar(
               radius: 60,
-              backgroundColor:
-                  Colors.white,
+              backgroundColor: Colors.white,
               child: Icon(
                 Icons.watch,
                 size: 60,
-                color:
-                    AppColors.primary,
+                color: AppColors.primary,
               ),
             ),
 
@@ -182,66 +172,79 @@ Navigator.pushReplacement(
                 children: [
                   CircularProgressIndicator(),
                   SizedBox(height: 10),
-                  Text(
-                    "Searching...",
-                  ),
+                  Text("Searching..."),
                 ],
               ),
 
             const SizedBox(height: 20),
 
-            const Align(
-              alignment:
-                  Alignment.centerLeft,
-              child: Text(
-                "FOUND DEVICES",
-                style: TextStyle(
-                  fontWeight:
-                      FontWeight.bold,
+            if (!scanning && devices.isNotEmpty)
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  "FOUND DEVICES",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ),
 
-            const SizedBox(height: 10),
+            if (!scanning && devices.isNotEmpty)
+              const SizedBox(height: 10),
 
             Expanded(
-              child: ListView.builder(
-                itemCount:
-                    devices.length,
+              child: scanning
+                  ? const SizedBox()
+                  : devices.isEmpty
+                      ? const Center(
+                          child: Column(
+                            mainAxisAlignment:
+                                MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.bluetooth_disabled,
+                                size: 70,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                "No devices found",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                "Make sure your SafeBand is\npowered on and nearby.\nTap Refresh to scan again.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: devices.length,
+                          itemBuilder: (context, index) {
+                            final result = devices[index];
 
-                itemBuilder:
-                    (context, index) {
-                  final result =
-                      devices[index];
-
-                  final name =
-                      result.device
-                          .platformName;
-
-                  if (name.isEmpty) {
-                    return const SizedBox();
-                  }
-
-                  return DeviceTile(
-                    deviceName: name,
-                    signal: signalText(
-                      result.rssi,
-                    ),
-                    onPair: () {
-                      connectDevice(
-                        result.device,
-                      );
-                    },
-                  );
-                },
-              ),
+                            return DeviceTile(
+                              deviceName:
+                                  result.device.platformName,
+                              signal: signalText(result.rssi),
+                              onPair: () {
+                                connectDevice(result.device);
+                              },
+                            );
+                          },
+                        ),
             ),
 
             TextButton.icon(
               onPressed: () {},
-              icon: const Icon(
-                Icons.keyboard,
-              ),
+              icon: const Icon(Icons.keyboard),
               label: const Text(
                 "Enter code manually",
               ),

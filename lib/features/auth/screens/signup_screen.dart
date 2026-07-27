@@ -19,11 +19,9 @@ class SignupScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-
           child: Column(
             children: [
               const SizedBox(height: 40),
@@ -102,28 +100,44 @@ class SignupScreen extends StatelessWidget {
               PrimaryButton(
                 text: "Create Account",
                 onPressed: () async {
+                  // Check if any field is empty
+                  if (nameController.text.trim().isEmpty ||
+                      emailController.text.trim().isEmpty ||
+                      phoneController.text.trim().isEmpty ||
+                      passwordController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Please fill in all the details."),
+                      ),
+                    );
+                    return;
+                  }
+
+                  // Password validation
+                  if (passwordController.text.trim().length < 6) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Password must be at least 6 characters.",
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
                   try {
                     await AuthService().signUp(
-  name: nameController.text.trim(),
-  email: emailController.text.trim(),
-  phone: phoneController.text.trim(),
-  password: passwordController.text.trim(),
-);
-if (passwordController.text.trim().length < 6) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text(
-        "Password must be at least 6 characters",
-      ),
-    ),
-  );
-  return;
-}
+                      name: nameController.text.trim(),
+                      email: emailController.text.trim(),
+                      phone: phoneController.text.trim(),
+                      password: passwordController.text.trim(),
+                    );
+
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
-                            "Account created successfully",
+                            "Account created successfully.",
                           ),
                         ),
                       );
@@ -140,6 +154,14 @@ if (passwordController.text.trim().length < 6) {
                       SnackBar(
                         content: Text(
                           e.message ?? "Signup failed",
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          e.toString(),
                         ),
                       ),
                     );

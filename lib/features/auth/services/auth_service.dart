@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';//stores details
-
+import 'package:firebase_messaging/firebase_messaging.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore =
@@ -36,12 +36,27 @@ class AuthService {
   }
 
   Future<void> login({
-    required String email,
-    required String password,
-  }) async {
-    await _auth.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-  }
+  required String email,
+  required String password,
+}) async {
+  UserCredential userCredential =
+      await _auth.signInWithEmailAndPassword(
+    email: email,
+    password: password,
+  );
+
+  // Get the FCM token
+  String? token =
+      await FirebaseMessaging.instance.getToken();
+
+  // Save it in Firestore
+  await _firestore
+      .collection('users')
+      .doc(userCredential.user!.uid)
+      .update({
+    'fcmToken': token,
+  });
+
+  print("FCM Token saved!");
+}
 }

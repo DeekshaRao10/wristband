@@ -55,34 +55,56 @@ Future<List<String>> getWifiList(
 
   return [];
 }
-  Future<bool> sendWifiCredentials(
+ Future<bool> sendWifiCredentials(
   BluetoothDevice device,
   String ssid,
   String password,
+  String firebaseEmail,
+  String firebasePassword,
+  String bandId,
 ) async {
+
+  print("===== sendWifiCredentials() CALLED =====");
 
   List<BluetoothService> services =
       await device.discoverServices();
 
+  print("Services found: ${services.length}");
+
   for (BluetoothService service in services) {
+
+    print("Service: ${service.uuid}");
 
     if (service.uuid.toString() == serviceUuid) {
 
       for (BluetoothCharacteristic characteristic
           in service.characteristics) {
 
+        print("Characteristic: ${characteristic.uuid}");
+
         if (characteristic.uuid.toString() == wifiWriteUuid) {
 
-          String data = "$ssid|$password";
+          String data =
+              "$ssid|$password|$firebaseEmail|$firebasePassword|$bandId";
 
-          await characteristic.write(
-            data.codeUnits,
-            withoutResponse: false,
-          );
+          print("Writing:");
+          print(data);
 
-          print("WiFi credentials sent: $data");
+          try {
+  await characteristic.write(
+    data.codeUnits,
+    withoutResponse: false,
+  );
 
-          return true;
+  print("Write completed!");
+} catch (e) {
+  print("BLE disconnected after write (expected): $e");
+}
+
+// Give ESP32 time to reboot
+await Future.delayed(const Duration(seconds: 2));
+
+return true;
         }
       }
     }

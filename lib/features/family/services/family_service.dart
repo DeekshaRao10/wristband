@@ -72,8 +72,16 @@ await _firestore
   'uid': user.uid,
   'name': userDoc.data()?['name'] ?? '',
   'email': userDoc.data()?['email'] ?? '',
+  // Was never being saved before, even though users/{uid} already has it
+  // from signup — FamilyMembersScreen needs this to show real phone
+  // numbers instead of leaving them blank.
+  'phone': userDoc.data()?['phone'] ?? '',
   'role': 'Admin',
 'familyId': doc.id,
+  // Default on; this is what the "App Notifications" toggle in
+  // FamilyMembersScreen actually reads/writes, and what the alert
+  // listener checks before sending a push to this member.
+  'notificationsEnabled': true,
   'joinedAt':
       FieldValue.serverTimestamp(),
 });
@@ -155,8 +163,11 @@ await _firestore
         userDoc.data()?['name'] ?? '',
     'email':
         userDoc.data()?['email'] ?? '',
+    'phone':
+        userDoc.data()?['phone'] ?? '',
     'role': 'Member',
     'familyId': familyId,
+    'notificationsEnabled': true,
     'joinedAt':
         FieldValue.serverTimestamp(),
   });

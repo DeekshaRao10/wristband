@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/app_text_field.dart';
 import '../../bands/screens/dashboard_screen.dart';
 import '../../bands/services/band_service.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -92,7 +93,7 @@ Future<void> pickProfileImage() async {
   }
 }
 
-  
+
 
 Future<void> loadWifiNetworks() async {
 
@@ -120,6 +121,7 @@ setState(() {
 }
 
 Future<void> finishSetup() async {
+print("Finish Setup pressed");
   // Common required fields
   if (selectedWifi == null ||
       wifiPasswordController.text.trim().isEmpty ||
@@ -163,67 +165,72 @@ Future<void> finishSetup() async {
     return;
   }
 
+ try {
+  // STEP 1: Create the band and Firebase user first
+  if (selectedWearer == "new") {
+    debugPrint("Creating band...");
+
+    await BandService().createBand(
+      deviceId: widget.deviceId,
+      bandName: bandNameController.text.trim(),
+      wearerName: fullNameController.text.trim(),
+      age: int.parse(ageController.text.trim()),
+      address: addressController.text.trim(),
+      bloodGroup: selectedBloodGroup!,
+      medicalConditions: medicalController.text.trim(),
+      doctorPhone: doctorPhoneController.text.trim(),
+      wearerEmail: emailController.text.trim(),
+      wearerPassword: userPasswordController.text.trim(),
+    );
+  } else {
+    await BandService().createBand(
+      deviceId: widget.deviceId,
+      bandName: bandNameController.text.trim(),
+      wearerName: fullNameController.text.trim(),
+      age: int.parse(ageController.text.trim()),
+      address: addressController.text.trim(),
+      bloodGroup: selectedBloodGroup!,
+      medicalConditions: medicalController.text.trim(),
+      doctorPhone: doctorPhoneController.text.trim(),
+    );
+  }
+
+  debugPrint("Band created successfully.");
+
+  // STEP 2: Send WiFi credentials to ESP32
   bool sent = await WifiScanService().sendWifiCredentials(
     device,
     selectedWifi!,
     wifiPasswordController.text.trim(),
+    emailController.text.trim(),
+    userPasswordController.text.trim(),
+    widget.deviceId,
   );
 
   if (!sent) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Failed to send WiFi credentials"),
-      ),
-    );
-    return;
+    throw Exception("Failed to send WiFi credentials");
   }
 
-  try {
-    if (selectedWearer == "new") {
-      await BandService().createBand(
-        deviceId: widget.deviceId,
-        bandName: bandNameController.text.trim(),
-        wearerName: fullNameController.text.trim(),
-        age: int.parse(ageController.text.trim()),
-        address: addressController.text.trim(),
-        bloodGroup: selectedBloodGroup!,
-        medicalConditions: medicalController.text.trim(),
-        doctorPhone: doctorPhoneController.text.trim(),
-        wearerEmail: emailController.text.trim(),
-        wearerPassword: userPasswordController.text.trim(),
-      );
-    } else {
-      await BandService().createBand(
-        deviceId: widget.deviceId,
-        bandName: bandNameController.text.trim(),
-        wearerName: fullNameController.text.trim(),
-        age: int.parse(ageController.text.trim()),
-        address: addressController.text.trim(),
-        bloodGroup: selectedBloodGroup!,
-        medicalConditions: medicalController.text.trim(),
-        doctorPhone: doctorPhoneController.text.trim(),
-      );
-    }
+  if (!mounted) return;
 
-    if (!mounted) return;
+  // STEP 3: Go to Dashboard
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const DashboardScreen(),
+    ),
+  );
+} catch (e) {
+  if (!mounted) return;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const DashboardScreen(),
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        e.toString().replaceFirst("Exception: ", ""),
       ),
-    );
-  } catch (e) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          e.toString().replaceFirst("Exception: ", ""),
-        ),
-      ),
-    );
-  }
+    ),
+  );
+}
 }
   @override
   Widget build(BuildContext context) {
@@ -303,7 +310,7 @@ Card(
 
         const SizedBox(height: 15),
 
-      
+
 DropdownButtonFormField<String>(
   value: selectedWifi,
 hint: const Text("Select WiFi"),
@@ -325,16 +332,10 @@ hint: const Text("Select WiFi"),
   },
 ),    const SizedBox(height: 12),
 
-        TextField(
-          controller:
-              wifiPasswordController,
+        AppTextField(
+          controller: wifiPasswordController,
           obscureText: true,
-          decoration:
-              const InputDecoration(
-            labelText: "Password *",
-            border:
-                OutlineInputBorder(),
-          ),
+          labelText: "Password *",
         ),
       ],
     ),
@@ -383,7 +384,7 @@ Card(
           color:
               selectedWearer == "user"
                   ? AppColors.primary
-                  : Colors.white,
+                  : AppColors.white,
           borderRadius:
               BorderRadius.circular(20),
           border: Border.all(
@@ -395,8 +396,8 @@ Card(
           style: TextStyle(
             color:
                 selectedWearer == "user"
-                    ? Colors.white
-                    : Colors.black,
+                    ? AppColors.white
+                    : AppColors.black,
           ),
         ),
       ),
@@ -421,7 +422,7 @@ Card(
           color:
               selectedWearer == "new"
                   ? AppColors.primary
-                  : Colors.white,
+                  : AppColors.white,
           borderRadius:
               BorderRadius.circular(20),
           border: Border.all(
@@ -433,8 +434,8 @@ Card(
           style: TextStyle(
             color:
                 selectedWearer == "new"
-                    ? Colors.white
-                    : Colors.black,
+                    ? AppColors.white
+                    : AppColors.black,
           ),
         ),
       ),
@@ -459,7 +460,7 @@ if (showProfileForm) ...[
 
           CircleAvatar(
   radius: 40,
-  backgroundColor: Colors.grey.shade200,
+  backgroundColor: AppColors.grey.shade200,
   backgroundImage:
       profileImage != null
           ? FileImage(profileImage!)
@@ -474,14 +475,12 @@ if (showProfileForm) ...[
           const SizedBox(width: 20),
 
 Expanded(
-  child: OutlinedButton.icon(
+  child: PrimaryButton(
+    text: "Upload Profile",
+    icon: Icons.upload,
+    outlined: true,
+    foregroundColor: AppColors.primary,
     onPressed: pickProfileImage,
-    icon: const Icon(
-      Icons.upload,
-    ),
-    label: const Text(
-      "Upload Profile",
-    ),
   ),
 ),
         ],
@@ -491,58 +490,43 @@ Expanded(
 
   const SizedBox(height: 20),
 
-  TextField(
+  AppTextField(
     controller: fullNameController,
-    decoration: const InputDecoration(
-      labelText: "Full Name *",
-      border: OutlineInputBorder(),
-    ),
+    labelText: "Full Name *",
   ),
 
   const SizedBox(height: 12),
 
-  TextField(
+  AppTextField(
     controller: ageController,
     keyboardType: TextInputType.number,
-    decoration: const InputDecoration(
-      labelText: "Age *",
-      border: OutlineInputBorder(),
-    ),
+    labelText: "Age *",
   ),
 
   const SizedBox(height: 12),
 
   if (selectedWearer == "new") ...[
 
-    TextField(
+    AppTextField(
       controller: emailController,
-      decoration: const InputDecoration(
-        labelText: "Email *",
-        border: OutlineInputBorder(),
-      ),
+      labelText: "Email *",
     ),
 
     const SizedBox(height: 12),
 
-    TextField(
+    AppTextField(
       controller: userPasswordController,
       obscureText: true,
-      decoration: const InputDecoration(
-        labelText: "Password *",
-        border: OutlineInputBorder(),
-      ),
+      labelText: "Password *",
     ),
 
     const SizedBox(height: 12),
   ],
 
-  TextField(
+  AppTextField(
     controller: addressController,
     maxLines: 2,
-    decoration: const InputDecoration(
-      labelText: "Home Address *",
-      border: OutlineInputBorder(),
-    ),
+    labelText: "Home Address *",
   ),
 ],
 
@@ -629,33 +613,18 @@ Card(
 
         const SizedBox(height: 12),
 
-        TextField(
-          controller:
-              medicalController,
+        AppTextField(
+          controller: medicalController,
           maxLines: 3,
-          decoration:
-              const InputDecoration(
-            labelText:
-                "Medical Conditions *",
-            border:
-                OutlineInputBorder(),
-          ),
+          labelText: "Medical Conditions *",
         ),
 
         const SizedBox(height: 12),
 
-        TextField(
-          controller:
-              doctorPhoneController,
-          keyboardType:
-              TextInputType.phone,
-          decoration:
-              const InputDecoration(
-            labelText:
-                "Doctor Phone (Optional)",
-            border:
-                OutlineInputBorder(),
-          ),
+        AppTextField(
+          controller: doctorPhoneController,
+          keyboardType: TextInputType.phone,
+          labelText: "Doctor Phone (Optional)",
         ),
       ],
     ),
@@ -683,15 +652,10 @@ Card(
 
         const SizedBox(height: 15),
 
-        TextField(
+        AppTextField(
           controller: bandNameController,
-          decoration:
-              const InputDecoration(
-            labelText: "Band Name *",
-            hintText: "Mom's Watch",
-            border:
-                OutlineInputBorder(),
-          ),
+          labelText: "Band Name *",
+          hintText: "Mom's Watch",
         ),
       ],
     ),
