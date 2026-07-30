@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_text_field.dart';
@@ -132,6 +133,13 @@ class SignupScreen extends StatelessWidget {
                       phone: phoneController.text.trim(),
                       password: passwordController.text.trim(),
                     );
+
+                    // Account created — remember that this device has a
+                    // real account, so if the user logs out later, the
+                    // splash screen sends them back to Login instead of
+                    // Onboarding (see splash_screen.dart).
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('has_account', true);
 
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(

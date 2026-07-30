@@ -1,91 +1,43 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
- 
+import 'package:share_plus/share_plus.dart';
+
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/local_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/services/wearer_resolver.dart';
 import '../../bands/screens/band_detail_screen.dart';
+import '../../bands/screens/notifications_screen.dart';
 import '../../pairing/screens/pair_scan_screen.dart';
 import '../../settings/screens/settings_screen.dart';
- 
+
 class FamilyMembersScreen extends StatelessWidget {
   final String familyId;
   final String familyName;
   final String inviteCode;
- 
+
   const FamilyMembersScreen({
     super.key,
     required this.familyId,
     required this.familyName,
     required this.inviteCode,
   });
- 
-  void _showInviteSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Invite a family member",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                "Share this code — they can join $familyName from the app's \"Join Family\" screen.",
-                style: const TextStyle(color: AppColors.mutedText),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  inviteCode,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 4,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              PrimaryButton(
-                text: "Copy Code",
-                icon: Icons.copy,
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: inviteCode));
-                  Navigator.pop(sheetContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Invite code copied")),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
+
+  // Opens the phone's native share sheet (WhatsApp, SMS, email, etc.)
+  // directly with the invite code, instead of showing a bottom sheet
+  // with just a copy button — one tap to actually send it to someone.
+  Future<void> _shareInviteCode(BuildContext context) async {
+    await Share.share(
+      'Join my family "$familyName" on SafeBand!\n\n'
+      'Use invite code: $inviteCode\n\n'
+      'Open the SafeBand app > Join Family > enter this code.',
+      subject: 'SafeBand family invite',
     );
   }
- 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -102,14 +54,87 @@ class FamilyMembersScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none,
-              color: AppColors.black,
-            ),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("No new notifications")),
+          // Same real notification history as the Dashboard bell — backed
+          // by families/{familyId}/alerts, with a live count badge (like
+          // a phone/messaging app icon) showing how many alerts are
+          // currently unresolved, instead of the old static
+          // "No new notifications" snackbar that never reflected anything.
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('families')
+                .doc(familyId)
+                .collection('alerts')
+                .where('resolved', isEqualTo: false)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return IconButton(
+                  icon: const Icon(Icons.error_outline, color: Colors.orange),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Notifications error: ${snapshot.error}"),
+                      ),
+                    );
+                  },
+                );
+              }
+
+              final unresolvedCount = snapshot.data?.docs.length ?? 0;
+              final hasActiveAlert = unresolvedCount > 0;
+
+              return IconButton(
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      hasActiveAlert
+                          ? Icons.notifications_active
+                          : Icons.notifications_none,
+                      color: hasActiveAlert
+                          ? AppColors.danger
+                          : AppColors.black,
+                    ),
+                    if (hasActiveAlert)
+                      Positioned(
+                        right: -6,
+                        top: -6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.danger,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: AppColors.background,
+                              width: 1.5,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            unresolvedCount > 9 ? '9+' : '$unresolvedCount',
+                            style: const TextStyle(
+                              color: AppColors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => NotificationsScreen(familyId: familyId),
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -125,7 +150,7 @@ class FamilyMembersScreen extends StatelessWidget {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
- 
+
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('families')
@@ -139,20 +164,32 @@ class FamilyMembersScreen extends StatelessWidget {
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
- 
+
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
                     child: Text("No family members found"),
                   );
                 }
- 
-                final members = snapshot.data!.docs;
- 
+
+                final members = [...snapshot.data!.docs];
+
+                // Admin always shown first, regardless of Firestore's
+                // (otherwise arbitrary) query order.
+                members.sort((a, b) {
+                  final aIsAdmin =
+                      (a.data() as Map<String, dynamic>)['role'] == 'Admin';
+                  final bIsAdmin =
+                      (b.data() as Map<String, dynamic>)['role'] == 'Admin';
+
+                  if (aIsAdmin == bIsAdmin) return 0;
+                  return aIsAdmin ? -1 : 1;
+                });
+
                 return Column(
                   children: members.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
- 
+
                     return _MemberCard(
                       familyId: familyId,
                       memberId: doc.id,
@@ -166,15 +203,15 @@ class FamilyMembersScreen extends StatelessWidget {
                 );
               },
             ),
- 
+
             const SizedBox(height: 24),
- 
+
             const Text(
               "Bands",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
- 
+
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('bands')
@@ -187,41 +224,60 @@ class FamilyMembersScreen extends StatelessWidget {
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
- 
+
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
                     child: Text("No bands added yet"),
                   );
                 }
- 
+
                 final bands = snapshot.data!.docs;
- 
+
                 return Column(
                   children: bands.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
- 
-                    return _BandCard(
-                      bandId: doc.id,
-                      deviceId: data['deviceId'] ?? '',
-                      bandName: data['bandName'] ?? 'SafeBand',
-                      wearerName: data['wearerName'] ?? 'Unknown',
+
+                    final rawWearerUid = (data['wearerUid'] ?? '').toString();
+
+                    // Same self-healing lookup as Dashboard/Band Detail —
+                    // bands created before wearerUid existed (or with a
+                    // separate wearer account never linked back) still
+                    // resolve to the real wearer via wearer_resolver.dart.
+                    // No ownerId fallback: that made "You" show on every
+                    // band the admin owns instead of only the one they
+                    // actually wear.
+                    return FutureBuilder<String>(
+                      future: resolveWearerUid(
+                        bandId: doc.id,
+                        rawWearerUid: rawWearerUid,
+                      ),
+                      initialData: rawWearerUid,
+                      builder: (context, wearerUidSnapshot) {
+                        return _BandCard(
+                          bandId: doc.id,
+                          deviceId: data['deviceId'] ?? '',
+                          bandName: data['bandName'] ?? 'SafeBand',
+                          wearerName: data['wearerName'] ?? 'Unknown',
+                          wearerUid: wearerUidSnapshot.data ?? '',
+                        );
+                      },
                     );
                   }).toList(),
                 );
               },
             ),
- 
+
             const SizedBox(height: 24),
- 
+
             PrimaryButton(
-              text: "Invite member",
-              icon: Icons.person_add,
-              onPressed: () => _showInviteSheet(context),
+              text: "Share Code",
+              icon: Icons.share,
+              onPressed: () => _shareInviteCode(context),
             ),
- 
+
             const SizedBox(height: 12),
- 
+
             PrimaryButton(
               text: "Add band",
               icon: Icons.add,
@@ -236,7 +292,7 @@ class FamilyMembersScreen extends StatelessWidget {
                 );
               },
             ),
- 
+
             const SizedBox(height: 12),
           ],
         ),
@@ -263,7 +319,7 @@ class FamilyMembersScreen extends StatelessWidget {
     );
   }
 }
- 
+
 class _MemberCard extends StatelessWidget {
   final String familyId;
   final String memberId;
@@ -271,7 +327,7 @@ class _MemberCard extends StatelessWidget {
   final String phone;
   final String role;
   final bool notificationsEnabled;
- 
+
   const _MemberCard({
     required this.familyId,
     required this.memberId,
@@ -280,7 +336,7 @@ class _MemberCard extends StatelessWidget {
     required this.role,
     required this.notificationsEnabled,
   });
- 
+
   Future<void> _setNotificationsEnabled(bool value) {
     return FirebaseFirestore.instance
         .collection('families')
@@ -289,21 +345,22 @@ class _MemberCard extends StatelessWidget {
         .doc(memberId)
         .update({'notificationsEnabled': value});
   }
- 
+
   @override
   Widget build(BuildContext context) {
     final isWearer = role == 'Wearer';
     final isAdmin = role == 'Admin';
- 
-    // Matches the reference design: the Admin's badge reads "1ST CONTACT"
-    // instead of "Admin" (there's no separate "primary contact" concept in
-    // the data yet, so this is the closest real thing available). Other
-    // roles show their role name directly on the badge.
-    final badgeText = isAdmin ? "1ST CONTACT" : role.toUpperCase();
+
+    // memberId IS this member's uid (families/{familyId}/members/{uid}),
+    // so this is a direct, reliable check — no name-string matching needed.
+    final isMe = memberId == FirebaseAuth.instance.currentUser?.uid;
+    final displayName = isMe ? "You" : name;
+
+    final badgeText = role.toUpperCase();
     final badgeColor = isAdmin
         ? AppColors.success
         : (isWearer ? Colors.orange : AppColors.primary);
- 
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -316,9 +373,17 @@ class _MemberCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const CircleAvatar(
+              // Shows a locally-saved photo if one exists for this
+              // member's uid on THIS device — in practice, that's only
+              // ever the currently-signed-in user's own photo (since
+              // photos aren't synced anywhere), so other members'
+              // cards will still show the plain icon unless their
+              // photo also happens to be saved on this same phone.
+              LocalAvatar(
+                photoKey: memberId,
                 backgroundColor: AppColors.primary,
-                child: Icon(Icons.person, color: AppColors.white),
+                fallbackIcon: Icons.person,
+                iconColor: AppColors.white,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -326,7 +391,7 @@ class _MemberCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      name,
+                      displayName,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     if (isAdmin)
@@ -366,7 +431,7 @@ class _MemberCard extends StatelessWidget {
               ),
             ],
           ),
- 
+
           // Notification preferences only make sense for caregivers, not
           // for the wearer's own card.
           if (!isWearer) ...[
@@ -382,41 +447,34 @@ class _MemberCard extends StatelessWidget {
                 ),
               ],
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "SMS Emergency Alerts (coming soon)",
-                  style: TextStyle(color: AppColors.mutedText),
-                ),
-                Switch(
-                  value: false,
-                  onChanged: null, // Disabled — SMS sending isn't built yet.
-                ),
-              ],
-            ),
           ],
         ],
       ),
     );
   }
 }
- 
+
 class _BandCard extends StatelessWidget {
   final String bandId;
   final String deviceId;
   final String bandName;
   final String wearerName;
- 
+  final String wearerUid;
+
   const _BandCard({
     required this.bandId,
     required this.deviceId,
     required this.bandName,
     required this.wearerName,
+    required this.wearerUid,
   });
- 
+
   @override
   Widget build(BuildContext context) {
+    final isMe = wearerUid.isNotEmpty &&
+        wearerUid == FirebaseAuth.instance.currentUser?.uid;
+    final displayWearer = isMe ? "You" : wearerName;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -450,7 +508,7 @@ class _BandCard extends StatelessWidget {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    "Worn by $wearerName",
+                    "Worn by $displayWearer",
                     style: const TextStyle(
                       color: AppColors.mutedText,
                       fontSize: 12,
@@ -468,7 +526,7 @@ class _BandCard extends StatelessWidget {
     );
   }
 }
- 
+
 /// Reads the band's live "lastUpdated" timestamp directly from the
 /// Realtime Database (where the ESP32 writes it every ~5s) and shows
 /// Online/Offline based on how recent it is — this replaces a hardcoded
@@ -476,35 +534,35 @@ class _BandCard extends StatelessWidget {
 /// battery-level display here because the firmware doesn't report one.
 class _OnlineStatusChip extends StatelessWidget {
   final String deviceId;
- 
+
   const _OnlineStatusChip({required this.deviceId});
- 
+
   @override
   Widget build(BuildContext context) {
     if (deviceId.isEmpty) return const SizedBox.shrink();
- 
+
     final ref = FirebaseDatabase.instanceFor(
       app: Firebase.app(),
       databaseURL:
           'https://safeband-a3b89-default-rtdb.asia-southeast1.firebasedatabase.app',
     ).ref('bands/$deviceId/lastUpdated');
- 
+
     return StreamBuilder<DatabaseEvent>(
       stream: ref.onValue,
       builder: (context, snapshot) {
         bool online = false;
- 
+
         final value = snapshot.data?.snapshot.value;
- 
+
         if (value != null) {
           final lastUpdated = (value as num).toInt();
           final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
- 
+
           // The band uploads roughly every 5 seconds, so anything within
           // the last 15 seconds is treated as currently online.
           online = (nowEpoch - lastUpdated) < 15;
         }
- 
+
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
@@ -524,4 +582,3 @@ class _OnlineStatusChip extends StatelessWidget {
     );
   }
 }
- 

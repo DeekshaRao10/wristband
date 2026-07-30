@@ -1,10 +1,16 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/local_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/services/local_photo_store.dart';
 import '../../pairing/screens/change_wifi_screen.dart';
+import '../../auth/screens/login_screen.dart';
 
 /// A single, simple Settings screen (account info, real working
 /// preference toggles, band WiFi shortcut, app version, logout) —
@@ -35,6 +41,20 @@ class SettingsScreen extends StatelessWidget {
     if (confirmed != true) return;
 
     await FirebaseAuth.instance.signOut();
+
+    if (!context.mounted) return;
+
+    // signOut() alone doesn't move the UI anywhere — there's no global
+    // auth-state listener redirecting screens in this app, navigation
+    // is all manual (same pattern splash_screen.dart uses). So this has
+    // to explicitly send the user to Login, and pushAndRemoveUntil
+    // wipes the entire Dashboard/Family/Settings back stack so there's
+    // no way to swipe/back into a signed-out session's screens.
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => LoginScreen()),
+      (route) => false,
+    );
   }
 
   Future<void> _openChangeWifi(BuildContext context, String familyId) async {
@@ -145,48 +165,12 @@ class SettingsScreen extends StatelessWidget {
                 return ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    // Profile card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Row(
-                        children: [
-                          const CircleAvatar(
-                            radius: 28,
-                            backgroundColor: AppColors.background,
-                            child: Icon(Icons.person,
-                                color: AppColors.primary, size: 30),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  name,
-                                  style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.black,
-                                  ),
-                                ),
-                                if ((user.email ?? '').isNotEmpty)
-                                  Text(
-                                    user.email!,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: AppColors.mutedText,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                    // Profile card — tap the avatar to pick/replace a
+                    // profile photo.
+                    _ProfileCard(
+                      uid: user.uid,
+                      name: name,
+                      email: user.email,
                     ),
 
                     const SizedBox(height: 20),
@@ -258,6 +242,129 @@ class SettingsScreen extends StatelessWidget {
                 );
               },
             ),
+    );
+  }
+}
+
+/// Profile card with a tap-to-pick photo — saved entirely on-device via
+/// LocalPhotoStore (keyed by the user's uid), not Firebase. That means
+/// it will only show up on THIS phone, not on other family members'
+/// phones — there's no cloud sync for it.
+class _ProfileCard extends StatefulWidget {
+  final String uid;
+  final String name;
+  final String? email;
+
+  const _ProfileCard({
+    required this.uid,
+    required this.name,
+    this.email,
+  });
+
+  @override
+  State<_ProfileCard> createState() => _ProfileCardState();
+}
+
+class _ProfileCardState extends State<_ProfileCard> {
+  final ImagePicker _picker = ImagePicker();
+
+  // Bumping this forces LocalAvatar's FutureBuilder to re-check disk
+  // for the just-saved photo instead of showing a cached old result.
+  Key _avatarKey = UniqueKey();
+
+  bool _saving = false;
+
+  Future<void> _pickPhoto() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+
+    if (picked == null) return;
+
+    setState(() => _saving = true);
+
+    await LocalPhotoStore.savePhoto(widget.uid, File(picked.path));
+
+    if (!mounted) return;
+
+    setState(() {
+      _saving = false;
+      _avatarKey = UniqueKey();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: _saving ? null : _pickPhoto,
+            child: Stack(
+              children: [
+                LocalAvatar(
+                  key: _avatarKey,
+                  photoKey: widget.uid,
+                  radius: 28,
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: _saving
+                        ? const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.white,
+                            ),
+                          )
+                        : const Icon(Icons.edit,
+                            size: 12, color: AppColors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.name,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.black,
+                  ),
+                ),
+                if ((widget.email ?? '').isNotEmpty)
+                  Text(
+                    widget.email!,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.mutedText,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

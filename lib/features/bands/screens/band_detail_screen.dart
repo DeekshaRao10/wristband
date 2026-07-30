@@ -1,8 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/wearer_resolver.dart';
 
 import '../widgets/medical_card.dart';
 import '../../pairing/screens/change_wifi_screen.dart';
@@ -49,77 +53,111 @@ class BandDetailScreen extends StatelessWidget {
           final band = snapshot.data!.data() as Map<String, dynamic>;
           final deviceId = band['deviceId'] ?? '';
           final wearerName = band['wearerName'] ?? '';
+
+          final rawWearerUid = (band['wearerUid'] ?? '').toString();
+
           final stepGoal = band['stepGoal'] ?? 5000;
 
-          return SafeArea(
-            child: Column(
-              children: [
-                _DetailAppBar(
-                  wearerName: wearerName,
-                  onSettingsTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChangeWifiScreen(deviceId: deviceId),
-                      ),
-                    );
-                  },
-                ),
-
-                Expanded(
-                  child: _LiveVitals(
-                    deviceId: deviceId,
-                    builder: (context, online, lastSyncText, heartRate, spo2) {
-                      return SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            _StatusCard(
-                              wearerName: wearerName,
-                              online: online,
-                              battery: band['battery'] ?? 100,
-                              lastSyncText: lastSyncText,
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            _HeartRateCard(heartRate: heartRate),
-
-                            const SizedBox(height: 16),
-
-                            _BloodOxygenCard(spo2: spo2),
-
-                            const SizedBox(height: 16),
-
-                            _StepsCard(
-                              bandId: bandId,
-                              steps: band['steps'] ?? 0,
-                              goal: stepGoal,
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            _LastMovementCard(lastSyncText: lastSyncText),
-
-                            const SizedBox(height: 16),
-
-                            MedicalCard(
-                              bloodGroup: band['bloodGroup'] ?? '',
-                              medicalConditions:
-                                  band['medicalConditions'] ?? '',
-                              doctorPhone: band['doctorPhone'] ?? '',
-                              address: band['address'] ?? '',
-                            ),
-
-                            const SizedBox(height: 16),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+        
+          return FutureBuilder<String>(
+            future: resolveWearerUid(
+              bandId: bandId,
+              rawWearerUid: rawWearerUid,
             ),
+            initialData: rawWearerUid,
+            builder: (context, wearerUidSnapshot) {
+              final wearerUid = wearerUidSnapshot.data ?? '';
+
+              final isMe = wearerUid.isNotEmpty &&
+                  wearerUid == FirebaseAuth.instance.currentUser?.uid;
+              final displayName = isMe ? "You" : wearerName;
+
+              return SafeArea(
+                child: Column(
+                  children: [
+                    _DetailAppBar(
+                      wearerName: displayName,
+                      onSettingsTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ChangeWifiScreen(deviceId: deviceId),
+                          ),
+                        );
+                      },
+                    ),
+
+                    Expanded(
+                      child: _LiveVitals(
+                        deviceId: deviceId,
+                        builder:
+                            (context, online, lastSyncText, heartRate, spo2) {
+                          return SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                _StatusCard(
+                                  wearerName: displayName,
+                                  isMe: isMe,
+                                  online: online,
+                                  battery: band['battery'] ?? 100,
+                                  lastSyncText: lastSyncText,
+                                  
+                                  showClaimButton: wearerUid.isEmpty,
+                                  onClaim: () {
+                                    final uid = FirebaseAuth
+                                        .instance.currentUser?.uid;
+                                    if (uid == null) return;
+
+                                    FirebaseFirestore.instance
+                                        .collection('bands')
+                                        .doc(bandId)
+                                        .update({'wearerUid': uid});
+                                  },
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                _HeartRateCard(heartRate: heartRate),
+
+                                const SizedBox(height: 16),
+
+                                _BloodOxygenCard(spo2: spo2),
+
+                                const SizedBox(height: 16),
+
+                                _StepsCard(
+                                  bandId: bandId,
+                                  steps: band['steps'] ?? 0,
+                                  goal: stepGoal,
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                _LastMovementCard(lastSyncText: lastSyncText),
+
+                                const SizedBox(height: 16),
+
+                                MedicalCard(
+                                  bloodGroup: band['bloodGroup'] ?? '',
+                                  medicalConditions:
+                                      band['medicalConditions'] ?? '',
+                                  doctorPhone: band['doctorPhone'] ?? '',
+                                  address: band['address'] ?? '',
+                                ),
+
+                                const SizedBox(height: 16),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           );
         },
       ),
@@ -247,15 +285,21 @@ class _LiveVitals extends StatelessWidget {
 
 class _StatusCard extends StatelessWidget {
   final String wearerName;
+  final bool isMe;
   final bool online;
   final int battery;
   final String lastSyncText;
+  final bool showClaimButton;
+  final VoidCallback? onClaim;
 
   const _StatusCard({
     required this.wearerName,
+    this.isMe = false,
     required this.online,
     required this.battery,
     required this.lastSyncText,
+    this.showClaimButton = false,
+    this.onClaim,
   });
 
   @override
@@ -287,7 +331,7 @@ class _StatusCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            "$wearerName is doing well",
+            isMe ? "You're doing well" : "$wearerName is doing well",
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -311,6 +355,26 @@ class _StatusCard extends StatelessWidget {
               ),
             ],
           ),
+
+          // Only shown when nobody's explicitly linked as this band's
+          // wearer yet (e.g. an older band from before wearerUid
+          // existed). Tapping this is a deliberate, one-time claim —
+          // not an automatic guess — so it can't cause "You"/the
+          // profile photo to wrongly show up on every band again.
+          if (showClaimButton) ...[
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: onClaim,
+              child: const Text(
+                "This is my band — set me as the wearer",
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -716,14 +780,20 @@ class _Card extends StatelessWidget {
   }
 }
 
-/// Decorative pulse-wave line — there's still no per-second heart rate
-/// history stored anywhere to chart as real historical data, but this
-/// now actually reacts to the live heartRate value: higher BPM packs
-/// more pulse spikes into the same width AND scrolls faster (driven by
-/// [phase], 0..1, supplied by an AnimationController whose duration is
-/// tied to heartRate in _HeartRateCardState). Lower BPM = fewer, slower
-/// spikes. So the graph visibly changes as the real number changes,
-/// instead of playing the same fixed animation regardless of value.
+/// Real ECG-style trace: flat baseline, a small rounded P bump, another
+/// flat stretch, then a sharp Q-R-S spike (down, tall spike up, down
+/// past baseline), back to flat until the next beat — matching an
+/// actual heart-rate monitor readout. Two things make it read as "live"
+/// instead of a static repeating image:
+///   1. It continuously scrolls left in real time, driven by [phase]
+///      (0..1, supplied every frame by an AnimationController whose
+///      speed is tied to heartRate).
+///   2. Each individual beat's spike height varies slightly from the
+///      next (deterministically, via [_beatVariation]) instead of every
+///      beat being an identical stamped-out copy — the natural
+///      beat-to-beat jitter you see on a real hospital monitor.
+/// The BPM value still controls FREQUENCY (how tightly beats are
+/// spaced) on top of that per-beat variation.
 class _WavePainter extends CustomPainter {
   final Color color;
   final int heartRate;
@@ -734,6 +804,14 @@ class _WavePainter extends CustomPainter {
     required this.heartRate,
     required this.phase,
   });
+
+  // Deterministic pseudo-random value in [0, 1) for a given beat index —
+  // same index always gives the same value, so a beat's height doesn't
+  // flicker frame to frame, but different beats naturally differ.
+  double _beatVariation(int seed) {
+    final v = math.sin(seed * 12.9898) * 43758.5453;
+    return v - v.floorToDouble();
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -750,32 +828,19 @@ class _WavePainter extends CustomPainter {
 
     final safeBpm = heartRate > 0 ? heartRate : 75;
 
-    // How many full pulse cycles (the "wavelength") are visible across
-    // the width. This used to be (bpm / 22), which barely changed at
-    // all across a typical 75-90 demo range (only ~3.4 to ~4.1 — an
-    // imperceptible difference, which is why every beat looked the
-    // same). This version moves a full extra beat onto the screen for
-    // every 5 bpm above 75, so the spacing between beats visibly
-    // tightens up as heart rate rises.
-    final cycles = (3 + (safeBpm - 75) * 0.2).clamp(2.0, 8.0);
+    // Frequency scales directly with BPM: beats sit closer together as
+    // the rate climbs, further apart (more flat baseline between each
+    // one) as it drops.
+    final cycles = (2 + (safeBpm - 50) * 0.05).clamp(2.0, 7.0);
     final cycleWidth = w / cycles;
 
-    // Spike height is driven directly off each single BPM unit, not a
-    // broad ratio — so 80 vs 81 visibly differ, not just 75 vs 100.
-    // bpmDiff is how far above/below the 75 baseline the current reading
-    // is; every single unit adds a fixed pixel amount to the spike/dip
-    // height, clamped so it still fits inside the card.
-    final bpmDiff = safeBpm - 75;
-
-    // R-spike (main tall peak) and S-dip heights — driven per single BPM
-    // unit so 80 vs 81 visibly differ, not just big jumps like 75 vs 100.
-    final spikeUp = (h * 0.30 + bpmDiff * (h * 0.022))
-        .clamp(h * 0.10, h * 0.46);
-    final spikeDown = (h * 0.10 + bpmDiff * (h * 0.009))
-        .clamp(h * 0.04, h * 0.30);
-
-    final pWaveHeight = h * 0.06;
-    final tWaveHeight = h * 0.10;
+    // Base heights for each part of the complex — actual per-beat
+    // heights below are these scaled by _beatVariation, so beats vary
+    // (some taller, some shorter) instead of every one being identical.
+    final basePWave = h * 0.12;
+    final baseQDip = h * 0.10;
+    final baseRSpike = h * 0.46;
+    final baseSDip = h * 0.22;
 
     final shift = phase * cycleWidth;
 
@@ -783,33 +848,46 @@ class _WavePainter extends CustomPainter {
     double x = -cycleWidth + shift;
     path.moveTo(x, midY);
 
-    // Each cycle is a proper ECG-style PQRST complex — small P bump,
-    // sharp QRS spike, gentle T bump, then flat baseline until the next
-    // beat — instead of a single generic zigzag.
+    // Running beat index so each beat gets its own (but stable) random
+    // seed regardless of scroll position.
+    int beatIndex = -1;
+
     while (x < w + cycleWidth) {
-      path.lineTo(x + cycleWidth * 0.06, midY);
+      beatIndex++;
 
+      // Scale factors in roughly [0.75, 1.25] — enough variation to look
+      // natural without any single beat looking broken.
+      final rScale = 0.75 + _beatVariation(beatIndex) * 0.5;
+      final pScale = 0.75 + _beatVariation(beatIndex + 100) * 0.5;
+      final sScale = 0.75 + _beatVariation(beatIndex + 200) * 0.5;
+
+      final pWaveHeight = basePWave * pScale;
+      final qDip = baseQDip * rScale;
+      final rSpike = baseRSpike * rScale;
+      final sDip = baseSDip * sScale;
+
+      // Flat baseline leading into the beat.
+      path.lineTo(x + cycleWidth * 0.10, midY);
+
+      // Small rounded P wave bump.
       path.quadraticBezierTo(
-        x + cycleWidth * 0.10,
-        midY - pWaveHeight,
         x + cycleWidth * 0.14,
+        midY - pWaveHeight,
+        x + cycleWidth * 0.18,
         midY,
       );
 
-      path.lineTo(x + cycleWidth * 0.20, midY);
-      path.lineTo(x + cycleWidth * 0.24, midY + spikeDown * 0.4);
-      path.lineTo(x + cycleWidth * 0.28, midY - spikeUp);
-      path.lineTo(x + cycleWidth * 0.32, midY + spikeDown);
-      path.lineTo(x + cycleWidth * 0.38, midY);
-      path.lineTo(x + cycleWidth * 0.50, midY);
+      // Flat stretch before the sharp spike.
+      path.lineTo(x + cycleWidth * 0.28, midY);
 
-      path.quadraticBezierTo(
-        x + cycleWidth * 0.58,
-        midY - tWaveHeight,
-        x + cycleWidth * 0.66,
-        midY,
-      );
+      // Sharp Q-R-S complex — straight edges, not curves, for the crisp
+      // "monitor spike" look instead of a soft rounded bump.
+      path.lineTo(x + cycleWidth * 0.32, midY + qDip);
+      path.lineTo(x + cycleWidth * 0.37, midY - rSpike);
+      path.lineTo(x + cycleWidth * 0.42, midY + sDip);
+      path.lineTo(x + cycleWidth * 0.47, midY);
 
+      // Flat baseline out to the next beat.
       path.lineTo(x + cycleWidth, midY);
 
       x += cycleWidth;

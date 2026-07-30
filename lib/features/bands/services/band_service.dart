@@ -63,13 +63,19 @@ class BandService {
       throw Exception("This band is already registered.");
     }
 
-    // Create band
+    // Create band. wearerUid defaults to the admin's own uid — covers
+    // the "You" case (the person setting this up is the one wearing the
+    // band). If a separate wearer account gets created below, this is
+    // updated to that wearer's uid instead. Screens compare this against
+    // FirebaseAuth.instance.currentUser?.uid to show "You" instead of a
+    // name wherever the wearer is displayed.
     final bandRef = await firestore.collection('bands').add({
       'deviceId': deviceId,
       'ownerId': user.uid,
       'familyId': familyId,
       'bandName': bandName,
       'wearerName': wearerName,
+      'wearerUid': user.uid,
       'age': age,
       'address': address,
       'bloodGroup': bloodGroup,
@@ -125,6 +131,11 @@ print("Firebase Auth account created!");
 print("Wearer UID = ${wearerCredential.user!.uid}");
 
 final wearerUid = wearerCredential.user!.uid;
+
+        // A separate wearer account was created — this band's wearer is
+        // no longer the admin, so correct wearerUid to point at them.
+        await bandRef.update({'wearerUid': wearerUid});
+
         // Create wearer user document
         await firestore.collection('users').doc(wearerUid).set({
           'name': wearerName,
