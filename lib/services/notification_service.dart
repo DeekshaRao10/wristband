@@ -1,7 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+import '../core/services/navigation_service.dart';
+import '../features/emergency/screens/emergency_screen.dart';
 
 class NotificationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -59,6 +63,61 @@ class NotificationService {
       print("Foreground FCM message received: ${message.messageId}");
       _showLocalNotification(message);
     });
+
+    // Case 2: app was in the BACKGROUND (not closed) when the push
+    // arrived — Android/iOS already showed the system notification on
+    // their own, and this fires when the user taps it, bringing the app
+    // back to the foreground.
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print("Notification tapped (app was backgrounded): ${message.messageId}");
+      _handleMessageTap(message);
+    });
+
+    // Case 3: app was fully TERMINATED and the user tapped the
+    // notification, causing a cold start. getInitialMessage() only
+    // returns a non-null value on that very first check after such a
+    // launch — this must run once here, not on every subsequent resume.
+    final initialMessage = await messaging.getInitialMessage();
+    if (initialMessage != null) {
+      print("App launched from a terminated state via notification tap");
+      _handleMessageTap(initialMessage);
+    }
+  }
+
+  /// Shared handler for "the user tapped a fall-alert push notification
+  /// and the app is (now) open" — whether that notification came from
+  /// the OS tray (background/terminated) or was one we drew ourselves
+  /// while in the foreground (see onDidReceiveNotificationResponse in
+  /// _initLocalNotifications below).
+  void _handleMessageTap(RemoteMessage message) {
+    if (message.data['type'] != 'FALL_DETECTED') return;
+
+    final bandId = message.data['deviceId'];
+    if (bandId == null || bandId.isEmpty) return;
+
+    _openEmergencyScreen(bandId);
+  }
+
+  /// Pushes EmergencyScreen using the shared navigatorKey instead of a
+  /// BuildContext, since this can be called before any screen has been
+  /// built yet (cold start). addPostFrameCallback defers the actual push
+  /// until after the very next frame — safe to call this early; it just
+  /// waits until MaterialApp/Navigator actually exist.
+  ///
+  /// alertData is passed as an empty map on purpose: EmergencyScreen
+  /// re-fetches the wearer's profile from Firestore and live vitals from
+  /// RTDB itself by bandId, so nothing here is actually missing — it
+  /// just starts showing "--" for heart rate/SpO2 for the first tick
+  /// until the live listener catches up, same as it would for a few
+  /// hundred milliseconds even with data pre-filled.
+  void _openEmergencyScreen(String bandId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => EmergencyScreen(bandId: bandId, alertData: const {}),
+        ),
+      );
+    });
   }
 
   Future<void> _initLocalNotifications() async {
@@ -66,7 +125,19 @@ class NotificationService {
 
     const initSettings = InitializationSettings(android: androidInit);
 
-    await _localNotifications.initialize(initSettings);
+    await _localNotifications.initialize(
+      initSettings,
+      // Case 1 (continued below in _showLocalNotification): app was
+      // already in the FOREGROUND when the push arrived, so we drew this
+      // notification ourselves — this fires when the user taps THAT one.
+      // The payload carries the bandId we stashed on it below.
+      onDidReceiveNotificationResponse: (details) {
+        final bandId = details.payload;
+        if (bandId != null && bandId.isNotEmpty) {
+          _openEmergencyScreen(bandId);
+        }
+      },
+    );
 
     await _localNotifications
         .resolvePlatformSpecificImplementation<
@@ -92,6 +163,9 @@ class NotificationService {
           priority: Priority.high,
         ),
       ),
+      // Carries the bandId through to onDidReceiveNotificationResponse
+      // above if this particular notification gets tapped.
+      payload: message.data['deviceId'],
     );
   }
 
@@ -116,4 +190,3 @@ class NotificationService {
     print("FCM token saved to Firestore for user ${user.uid}");
   }
 }
-

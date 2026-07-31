@@ -62,6 +62,19 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
   int _caregiverCount = 0;
   bool _cancelling = false;
 
+  // Real phone numbers of caregivers (families/{familyId}/members.phone),
+  // collected alongside the caregiver count below — used by "ALERT NOW"
+  // to open a real SMS pre-filled to everyone, instead of a fake button.
+  final List<String> _caregiverPhones = [];
+
+  // Real, live vitals — seeded from the RTDB snapshot that triggered this
+  // screen (widget.alertData), then kept up to date by the same RTDB
+  // listener that already watches this band for recovery below. Replaces
+  // the old "Band buzzer is sounding" pill, which was static text with no
+  // hardware behind it.
+  int? _heartRate;
+  int? _spo2;
+
   final String _detectedAt = DateFormat('h:mm a').format(DateTime.now());
 
   // Guards against navigating away twice — both the manual "I'm OK"
@@ -75,6 +88,13 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Seed with whatever vitals came in on the snapshot that triggered
+    // this screen, so something real shows immediately before the RTDB
+    // listener below has ticked even once.
+    _heartRate = (widget.alertData['heartRate'] as num?)?.toInt();
+    _spo2 = (widget.alertData['spo2'] as num?)?.toInt();
+
     _loadBandAndFamilyInfo();
     _listenForRecovery();
   }
@@ -105,10 +125,61 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       final data = Map<String, dynamic>.from(value);
       final fallDetected = data['fallDetected'] == true;
 
+      if (mounted) {
+        setState(() {
+          _heartRate = (data['heartRate'] as num?)?.toInt() ?? _heartRate;
+          _spo2 = (data['spo2'] as num?)?.toInt() ?? _spo2;
+        });
+      }
+
       if (!fallDetected) {
         _goHome();
       }
     });
+  }
+
+  /// Opens the phone's native SMS app with every caregiver's real phone
+  /// number pre-filled as recipients and an emergency message drafted —
+  /// this device's OWNER still has to hit send (Android/iOS don't allow
+  /// apps to silently send SMS without the user confirming), but it's a
+  /// real, one-tap-to-nearly-done action, not a fake button.
+  Future<void> _sendEmergencySms() async {
+    if (_caregiverPhones.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("No caregiver phone numbers on file"),
+          ),
+        );
+      }
+      return;
+    }
+
+    final message = "EMERGENCY: $_wearerName has fallen and needs help. "
+        "Location: $_address. Detected at $_detectedAt.";
+
+    final uri = Uri(
+      scheme: 'sms',
+      path: _caregiverPhones.join(','),
+      queryParameters: {'body': message},
+    );
+
+    try {
+      final launched = await launchUrl(uri);
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Couldn't open messages app")),
+        );
+      }
+    } catch (e) {
+      debugPrint("EmergencyScreen: failed to launch SMS: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Couldn't open messages app")),
+        );
+      }
+    }
   }
 
   /// Opens the phone's dialer with the doctor's number pre-filled via a
@@ -259,6 +330,11 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
           if (fcmToken.isNotEmpty) {
             realCaregiverCount++;
           }
+
+          final phone = memberData['phone']?.toString() ?? '';
+          if (phone.isNotEmpty) {
+            _caregiverPhones.add(phone);
+          }
         }
 
         _caregiverCount = realCaregiverCount;
@@ -310,7 +386,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
           child: _loading
               ? const SafeArea(
                   child: Center(
-                    child: CircularProgressIndicator(color: AppColors.white),
+                    child: CircularProgressIndicator(color: AppColors.textOnColor),
                   ),
                 )
               : SafeArea(
@@ -323,14 +399,14 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                       children: [
                         Row(
                           children: const [
-                            Icon(Icons.watch, size: 20, color: AppColors.white),
+                            Icon(Icons.watch, size: 20, color: AppColors.textOnColor),
                             SizedBox(width: 8),
                             Text(
                               "Fall Alert",
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
-                                color: AppColors.white,
+                                color: AppColors.textOnColor,
                               ),
                             ),
                           ],
@@ -345,7 +421,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                     Text(
                       _wearerName.toUpperCase(),
                       style: const TextStyle(
-                        color: AppColors.white,
+                        color: AppColors.textOnColor,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
@@ -357,7 +433,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                     const Text(
                       "FALL DETECTED",
                       style: TextStyle(
-                        color: AppColors.white,
+                        color: AppColors.textOnColor,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
@@ -378,7 +454,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                       child: Text(
                         _detectedAt,
                         style: const TextStyle(
-                          color: AppColors.white,
+                          color: AppColors.textOnColor,
                           fontSize: 12,
                         ),
                       ),
@@ -386,10 +462,12 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
                     const SizedBox(height: 26),
 
-                    // Matches the reference design's buzzer-status pill.
-                    // NOTE: this is a visual/UI match only — there's no
-                    // physical buzzer wired to the ESP32 yet, so this is
-                    // aspirational until real buzzer firmware exists.
+                    // Real live vitals from the band at this exact
+                    // moment — pulled straight from RTDB (see _heartRate/
+                    // _spo2, kept live by _listenForRecovery above) —
+                    // replacing the old "Band buzzer is sounding" text,
+                    // which was static and not backed by any real
+                    // hardware.
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(
@@ -402,14 +480,26 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.volume_up,
-                              color: AppColors.white, size: 16),
-                          SizedBox(width: 8),
+                        children: [
+                          const Icon(Icons.favorite,
+                              color: AppColors.textOnColor, size: 16),
+                          const SizedBox(width: 6),
                           Text(
-                            "Band buzzer is sounding",
-                            style: TextStyle(
-                              color: AppColors.white,
+                            _heartRate != null ? "$_heartRate BPM" : "-- BPM",
+                            style: const TextStyle(
+                              color: AppColors.textOnColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 18),
+                          const Icon(Icons.water_drop,
+                              color: AppColors.textOnColor, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            _spo2 != null ? "$_spo2% SpO2" : "--% SpO2",
+                            style: const TextStyle(
+                              color: AppColors.textOnColor,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
@@ -423,7 +513,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                     Row(
                       children: [
                         const Icon(Icons.check_circle,
-                            color: AppColors.white, size: 18),
+                            color: AppColors.textOnColor, size: 18),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -439,7 +529,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                                 ? "Notifications sent to $_caregiverCount caregiver${_caregiverCount == 1 ? '' : 's'}"
                                 : "Notifying caregivers...",
                             style: const TextStyle(
-                              color: AppColors.white,
+                              color: AppColors.textOnColor,
                               fontSize: 13,
                             ),
                           ),
@@ -528,10 +618,17 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                                 style:
                                     TextStyle(color: AppColors.mutedText),
                               ),
-                              Text(
-                                _medicalConditions,
-                                style: const TextStyle(
-                                  color: AppColors.success,
+                              // While this screen is up, always read
+                              // "Emergency" here regardless of the
+                              // wearer's actual on-file medical
+                              // conditions (e.g. "normal") — a fall is
+                              // in progress, so this field should reflect
+                              // that urgency, not their baseline health
+                              // notes.
+                              const Text(
+                                "Emergency",
+                                style: TextStyle(
+                                  color: AppColors.alertCard,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -595,7 +692,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                       text: _cancelling ? "Cancelling..." : "I'm OK — Cancel",
                       icon: Icons.close,
                       outlined: true,
-                      foregroundColor: AppColors.white,
+                      foregroundColor: AppColors.textOnColor,
                       onPressed: _cancelling ? null : _cancelAlert,
                     ),
 
@@ -605,11 +702,11 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                       text: "ALERT NOW",
                       icon: Icons.campaign,
                       backgroundColor: AppColors.alertButton,
-                      onPressed: () {
-                        // Hook up your existing emergency-escalation
-                        // logic here (e.g. re-notify caregivers, call
-                        // emergency services, etc.) if you have it.
-                      },
+                      // Opens a real SMS pre-filled to every caregiver's
+                      // actual phone number on file, with an emergency
+                      // message already drafted (wearer name, location,
+                      // time) — just needs the user to hit send.
+                      onPressed: _sendEmergencySms,
                     ),
                       ],
                     ),
@@ -701,7 +798,7 @@ class _PulsingGlowAvatarState extends State<_PulsingGlowAvatar>
         height: avatarRadius * 2,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.white.withOpacity(opacity),
+          color: AppColors.textOnColor.withOpacity(opacity),
         ),
       ),
     );

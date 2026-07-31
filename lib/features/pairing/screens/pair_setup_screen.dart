@@ -122,7 +122,9 @@ setState(() {
 
 Future<void> finishSetup() async {
 print("Finish Setup pressed");
-  // Common required fields
+  // Common required fields — doctorPhone is now required too (it was
+  // "(Optional)" before, which is why plenty of already-created bands
+  // ended up with no doctor number to show on the Emergency screen).
   if (selectedWifi == null ||
       wifiPasswordController.text.trim().isEmpty ||
       fullNameController.text.trim().isEmpty ||
@@ -130,6 +132,7 @@ print("Finish Setup pressed");
       addressController.text.trim().isEmpty ||
       selectedBloodGroup == null ||
       medicalController.text.trim().isEmpty ||
+      doctorPhoneController.text.trim().isEmpty ||
       bandNameController.text.trim().isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -396,7 +399,7 @@ Card(
           style: TextStyle(
             color:
                 selectedWearer == "user"
-                    ? AppColors.white
+                    ? AppColors.textOnColor
                     : AppColors.black,
           ),
         ),
@@ -434,7 +437,7 @@ Card(
           style: TextStyle(
             color:
                 selectedWearer == "new"
-                    ? AppColors.white
+                    ? AppColors.textOnColor
                     : AppColors.black,
           ),
         ),
@@ -624,7 +627,7 @@ Card(
         AppTextField(
           controller: doctorPhoneController,
           keyboardType: TextInputType.phone,
-          labelText: "Doctor Phone (Optional)",
+          labelText: "Doctor Phone *",
         ),
       ],
     ),

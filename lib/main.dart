@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
+import 'core/services/navigation_service.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'services/notification_service.dart';
 
@@ -30,6 +31,7 @@ class SafeBandApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const SplashScreen(),
