@@ -10,16 +10,7 @@ import '../services/bluetooth_device_manager.dart';
 import '../services/wifi_scan_service.dart';
 import '../widgets/device_tile.dart';
 
-/// Lets the user update an ALREADY-PAIRED band's WiFi credentials without
-/// going through the full pairing flow again (which would try to
-/// BandService().createBand() and fail with "already registered").
-///
-/// Same BLE plumbing as PairScanScreen/PairSetupScreen — just skips the
-/// wearer/medical form and the Firestore band-creation step, since the
-/// band already exists. [deviceId] must be the band's real `deviceId`
-/// field from Firestore (the same value the ESP32 already uses as its
-/// RTDB path key), NOT the Firestore document id, so it keeps writing to
-/// the same RTDB node instead of a new one.
+
 class ChangeWifiScreen extends StatefulWidget {
   final String deviceId;
 
@@ -38,6 +29,11 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
 
   List<ScanResult> devices = [];
   bool scanning = true;
+
+  // True once we've kicked off an auto-connect attempt, so the scan
+  // listener doesn't try to connect a second time.
+  bool autoConnectAttempted = false;
+  bool connectFailed = false;
 
   BluetoothDevice? connectedDevice;
   bool loadingWifiList = false;
@@ -74,18 +70,34 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
       setState(() {
         scanning = true;
         devices = [];
+        connectFailed = false;
+        autoConnectAttempted = false;
       });
     }
 
     await bluetoothService.startScan();
 
     bluetoothService.scanResults.listen((results) {
-      if (mounted) {
-        setState(() {
-          devices = results
-              .where((r) => r.device.platformName.isNotEmpty)
-              .toList();
-        });
+      if (!mounted) return;
+
+      final filtered =
+          results.where((r) => r.device.platformName.isNotEmpty).toList();
+
+      setState(() => devices = filtered);
+
+      // Skip manual selection: as soon as the band shows up, connect to
+      // it automatically and jump straight to the WiFi form. The list
+      // below only appears as a fallback if this doesn't find a match.
+      if (!autoConnectAttempted && connectedDevice == null) {
+        final match = filtered.where(
+          (r) => r.device.platformName.startsWith('SafeBand'),
+        );
+
+        if (match.isNotEmpty) {
+          autoConnectAttempted = true;
+          bluetoothService.stopScan();
+          connectDevice(match.first.device);
+        }
       }
     });
 
@@ -96,6 +108,11 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
     if (mounted) {
       setState(() {
         scanning = false;
+        // Auto-connect never found a matching band within the scan
+        // window — fall back to letting the user pick manually.
+        if (connectedDevice == null && !autoConnectAttempted) {
+          connectFailed = true;
+        }
       });
     }
   }
@@ -111,6 +128,7 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
       setState(() {
         connectedDevice = device;
         loadingWifiList = true;
+        connectFailed = false;
       });
 
       final wifiList = await WifiScanService().getWifiList(device);
@@ -127,6 +145,11 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
       });
     } catch (e) {
       if (!mounted) return;
+
+      setState(() {
+        autoConnectAttempted = false;
+        connectFailed = true;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Connection failed")),
@@ -147,9 +170,7 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
     setState(() => sending = true);
 
     try {
-      // Firebase email/password fields aren't used anywhere in
-      // uploadVitals() — only bandId matters for the RTDB path — so they
-      // can be sent empty here.
+
       final sent = await WifiScanService().sendWifiCredentials(
         connectedDevice!,
         selectedWifi!,
@@ -209,13 +230,40 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
   }
 
   Widget _buildScanBody() {
+    // Still searching, or found a match and connecting to it — show a
+    // single "connecting" state instead of a device list.
+    if (!connectFailed) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              "Connecting to your band...",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            SizedBox(height: 6),
+            Text(
+              "Make sure it's charged and nearby.",
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Fallback: auto-connect couldn't find/connect to a band — let the
+    // user pick manually instead of getting stuck.
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           const SizedBox(height: 10),
           const Text(
-            "Make sure the band is charged and nearby, then select it below.",
+            "Couldn't connect automatically. Select your band below.",
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),

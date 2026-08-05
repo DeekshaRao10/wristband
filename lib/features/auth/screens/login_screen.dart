@@ -129,10 +129,6 @@ class LoginScreen extends StatelessWidget {
                       password: passwordController.text.trim(),
                     );
 
-                    // Login succeeded — remember that this device has a
-                    // real account, so if the user logs out later, the
-                    // splash screen sends them back to Login instead of
-                    // Onboarding (see splash_screen.dart).
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.setBool('has_account', true);
 
@@ -153,9 +149,7 @@ class LoginScreen extends StatelessWidget {
                       }
                       return;
                     }
-
-                    // Existing user
-                    final String role = membership['role'];
+                    final String role = membership['role'];//xisting user
                     final String bandId = membership['bandId'];
 
                     debugPrint("Role : $role");

@@ -6,10 +6,6 @@ class StatusCard extends StatelessWidget {
   final String wearerName;
   final int battery;
   final String lastSync;
-  // Real presence, computed by the caller from RTDB's lastUpdated — this
-  // used to be a hardcoded "Band Online" Chip regardless of actual data,
-  // which is why this screen never agreed with the family list's real
-  // online/offline badge.
   final bool online;
 
   const StatusCard({

@@ -4,16 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 
-/// Real notification history — every fall alert that's ever fired for
-/// this family, newest first, with a live "Active"/"Resolved" status
-/// chip per entry. Replaces the old bell icon's "No new notifications"
-/// snackbar, which never actually reflected anything real.
-///
-/// Backed by families/{familyId}/alerts, written to by
-/// dashboard_screen.dart: a doc gets created the moment a fall is
-/// detected (resolved: false), and updated to resolved: true the
-/// moment that band's fallDetected clears back to false — so this
-/// list is a genuine record, not just whatever's happening right now.
+
 class NotificationsScreen extends StatelessWidget {
   final String familyId;
 
@@ -36,14 +27,7 @@ class NotificationsScreen extends StatelessWidget {
             .collection('families')
             .doc(familyId)
             .collection('alerts')
-            // Ordering by 'timestamp' (a FieldValue.serverTimestamp()
-            // sentinel) hid brand-new alerts from this exact list: until
-            // the server resolves that field, Firestore's local cache
-            // can't place the doc in sort order and drops it from the
-            // live snapshot entirely, so a fresh alert simply never
-            // rendered. 'clientTimestamp' is a real value from the
-            // moment it's written, so newly created alerts sort and
-            // appear immediately.
+            
             .orderBy('clientTimestamp', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
@@ -102,12 +86,6 @@ class _AlertTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final wearerName = data['wearerName']?.toString() ?? 'Unknown';
     final resolved = data['resolved'] == true;
-
-    // 'timestamp' is server-resolved and reads back null for an instant
-    // right when the alert is created — 'clientTimestamp' is set the
-    // moment the alert fires, so it's always available immediately and
-    // is used first, with 'timestamp' as a backup for any older alerts
-    // logged before this field existed.
     final effectiveTimestamp =
         (data['clientTimestamp'] as Timestamp?) ?? (data['timestamp'] as Timestamp?);
 
@@ -184,3 +162,7 @@ class _AlertTile extends StatelessWidget {
     );
   }
 }
+
+
+//Dashboard----Notifications Screen---Receive Family ID---Listen to Firestore(families/{familyId}/alerts)---Receive Alert Documents---Sort by Latest Time---Create Alert Cards--Display
+//Wearer Name Fall Detected Time Active / Resolved

@@ -28,12 +28,8 @@ class _SplashScreenState extends State<SplashScreen> {
       () async {
         if (!mounted) return;
 
-        // Already signed in (and never logged out) -> skip straight to
-        // Home Dashboard. FirebaseAuth.instance.currentUser stays set
-        // across app restarts until signOut() is explicitly called
-        // (that's what Settings' "Log Out" button does), so this is a
-        // reliable "is this a returning, still-logged-in user" check.
-        final user = FirebaseAuth.instance.currentUser;
+
+        final user = FirebaseAuth.instance.currentUser;//already have acc directly move to dashboard
 
         if (user != null) {
           Navigator.pushReplacement(
@@ -43,13 +39,7 @@ class _SplashScreenState extends State<SplashScreen> {
           return;
         }
 
-        // Not signed in right now — but have they HAD an account on this
-        // device before (they logged out), or is this a genuinely new
-        // user who's never signed up? Firebase forgets currentUser the
-        // moment signOut() runs, so that distinction has to be tracked
-        // separately: login_screen.dart and signup_screen.dart both set
-        // this "has_account" flag the moment a login/signup actually
-        // succeeds, and it's never cleared on logout.
+
         final prefs = await SharedPreferences.getInstance();
         final hasAccount = prefs.getBool('has_account') ?? false;
 

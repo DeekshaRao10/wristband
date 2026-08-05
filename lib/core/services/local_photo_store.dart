@@ -1,61 +1,38 @@
+import 'dart:convert';
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Saves/loads profile photos entirely on THIS device — no Firebase
-/// Storage, no Firestore, no billing risk. The picked image is copied
-/// into the app's local documents folder and its path is remembered in
-/// SharedPreferences, keyed by whatever id you pass in (a band's
-/// deviceId for a wearer's photo, or a user's uid for their own account
-/// photo).
-///
-/// IMPORTANT LIMITATION: because nothing is uploaded anywhere, a photo
-/// only ever shows up on the SAME phone that picked it. A caregiver on
-/// a different phone will NOT see a wearer's photo picked during
-/// pairing on the wearer's/admin's phone — there's no way around that
-/// without syncing the image data through some backend. If you need the
-/// photo to show on other family members' phones too, this isn't
-/// enough on its own.
+// Profile photos stored directly in Firestore as base64 text — no
+// Firebase Storage, no Blaze plan needed. A resized profile photo
+// (512x512, quality 80) is typically 30-150KB, well under Firestore's
+// 1MB per-document limit even after base64's ~33% size inflation.
+//
+// Method names kept the same as before (savePhoto/getPhotoPath/
+// clearPhoto) so every call site (Settings, PairSetupScreen, LocalAvatar)
+// keeps working unchanged.
 class LocalPhotoStore {
+  static CollectionReference<Map<String, dynamic>> get _docs =>
+      FirebaseFirestore.instance.collection('profilePhotos');
+
   static Future<String> savePhoto(String key, File source) async {
-    final dir = await getApplicationDocumentsDirectory();
+    final bytes = await source.readAsBytes();
+    final base64Data = base64Encode(bytes);
 
-    final ext = source.path.contains('.')
-        ? source.path.split('.').last
-        : 'jpg';
+    await _docs.doc(key).set({
+      'data': base64Data,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
 
-    final dest = File('${dir.path}/profile_$key.$ext');
-
-    await source.copy(dest.path);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('photo_$key', dest.path);
-
-    return dest.path;
+    return base64Data;
   }
 
   static Future<String?> getPhotoPath(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString('photo_$key');
-
-    if (path == null) return null;
-    if (!await File(path).exists()) return null;
-
-    return path;
+    final doc = await _docs.doc(key).get();
+    return doc.data()?['data'] as String?;
   }
 
   static Future<void> clearPhoto(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString('photo_$key');
-
-    if (path != null) {
-      final file = File(path);
-      if (await file.exists()) {
-        await file.delete();
-      }
-    }
-
-    await prefs.remove('photo_$key');
+    await _docs.doc(key).delete();
   }
 }

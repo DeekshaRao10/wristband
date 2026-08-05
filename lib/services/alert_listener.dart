@@ -8,14 +8,7 @@ class AlertListener {
 
   bool _ignoreFirstSnapshot = true;
 
-  // Tracks the last known fallDetected value so onEmergency() only fires
-  // on a false -> true TRANSITION, not on every single update while a
-  // fall is already active. The ESP32 re-uploads fallDetected: true every
-  // ~5s for the whole emergency window, so without this the Emergency
-  // Screen would get pushed again and again every 5s during one active
-  // fall, and would also pop right back open in the few seconds after
-  // "I'm OK" is pressed — before the band's own cancel-check has had a
-  // chance to actually clear fallDetected in RTDB.
+
   bool _lastFallState = false;
 
   void startListening({
@@ -57,9 +50,7 @@ _subscription = database
       if (_ignoreFirstSnapshot) {
         _ignoreFirstSnapshot = false;
 
-        // Still record whatever fall state we started at, so if a fall
-        // is already active when the listener attaches, the very next
-        // update (still true) isn't mistaken for a brand new one.
+       
         _lastFallState = data['fallDetected'] ?? false;
 
         print("Initial snapshot ignored.");

@@ -12,10 +12,7 @@ import '../../../core/services/local_photo_store.dart';
 import '../../pairing/screens/change_wifi_screen.dart';
 import '../../auth/screens/login_screen.dart';
 
-/// A single, simple Settings screen (account info, real working
-/// preference toggles, band WiFi shortcut, app version, logout) —
-/// everything on this screen actually does something now instead of
-/// pointing you elsewhere.
+
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -44,12 +41,6 @@ class SettingsScreen extends StatelessWidget {
 
     if (!context.mounted) return;
 
-    // signOut() alone doesn't move the UI anywhere — there's no global
-    // auth-state listener redirecting screens in this app, navigation
-    // is all manual (same pattern splash_screen.dart uses). So this has
-    // to explicitly send the user to Login, and pushAndRemoveUntil
-    // wipes the entire Dashboard/Family/Settings back stack so there's
-    // no way to swipe/back into a signed-out session's screens.
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => LoginScreen()),
@@ -72,7 +63,7 @@ class SettingsScreen extends StatelessWidget {
       return;
     }
 
-    // Only one band -> skip straight to Change WiFi for it.
+    // Only one band -> skip straight to Change WiFi for it.....
     if (bandsSnap.docs.length == 1) {
       final band = bandsSnap.docs.first.data();
       Navigator.push(
@@ -84,7 +75,7 @@ class SettingsScreen extends StatelessWidget {
       return;
     }
 
-    // Multiple bands -> let the user pick which one.
+    // Multiple bands -> let the user pick which one.....
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.white,
@@ -246,10 +237,7 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-/// Profile card with a tap-to-pick photo — saved entirely on-device via
-/// LocalPhotoStore (keyed by the user's uid), not Firebase. That means
-/// it will only show up on THIS phone, not on other family members'
-/// phones — there's no cloud sync for it.
+
 class _ProfileCard extends StatefulWidget {
   final String uid;
   final String name;
@@ -268,8 +256,6 @@ class _ProfileCard extends StatefulWidget {
 class _ProfileCardState extends State<_ProfileCard> {
   final ImagePicker _picker = ImagePicker();
 
-  // Bumping this forces LocalAvatar's FutureBuilder to re-check disk
-  // for the just-saved photo instead of showing a cached old result.
   Key _avatarKey = UniqueKey();
 
   bool _saving = false;
@@ -278,13 +264,23 @@ class _ProfileCardState extends State<_ProfileCard> {
     final picked = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
+      maxWidth: 512,
+      maxHeight: 512,
     );
 
     if (picked == null) return;
 
     setState(() => _saving = true);
 
-    await LocalPhotoStore.savePhoto(widget.uid, File(picked.path));
+    try {
+      await LocalPhotoStore.savePhoto(widget.uid, File(picked.path));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Couldn't upload photo: $e")),
+        );
+      }
+    }
 
     if (!mounted) return;
 
@@ -369,10 +365,7 @@ class _ProfileCardState extends State<_ProfileCard> {
   }
 }
 
-/// Real, working toggle — reads/writes the signed-in user's own
-/// families/{familyId}/members/{uid}.notificationsEnabled field, the
-/// exact same field fall_alert_listener.js checks before sending a push
-/// and the same one Family Management's per-member switch controls.
+
 class _NotificationToggleTile extends StatelessWidget {
   final String familyId;
   final String uid;

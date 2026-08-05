@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/app_text_field.dart';
+import '../../../core/services/local_photo_store.dart';
 import '../../bands/screens/dashboard_screen.dart';
 import '../../bands/services/band_service.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -122,9 +123,7 @@ setState(() {
 
 Future<void> finishSetup() async {
 print("Finish Setup pressed");
-  // Common required fields — doctorPhone is now required too (it was
-  // "(Optional)" before, which is why plenty of already-created bands
-  // ended up with no doctor number to show on the Emergency screen).
+  
   if (selectedWifi == null ||
       wifiPasswordController.text.trim().isEmpty ||
       fullNameController.text.trim().isEmpty ||
@@ -143,6 +142,7 @@ print("Finish Setup pressed");
   }
 
   // Additional validation for "New Profile"
+
   if (selectedWearer == "new") {
     if (emailController.text.trim().isEmpty ||
         userPasswordController.text.trim().isEmpty) {
@@ -170,10 +170,12 @@ print("Finish Setup pressed");
 
  try {
   // STEP 1: Create the band and Firebase user first
+  String wearerUid;
+
   if (selectedWearer == "new") {
     debugPrint("Creating band...");
 
-    await BandService().createBand(
+    wearerUid = await BandService().createBand(
       deviceId: widget.deviceId,
       bandName: bandNameController.text.trim(),
       wearerName: fullNameController.text.trim(),
@@ -186,7 +188,7 @@ print("Finish Setup pressed");
       wearerPassword: userPasswordController.text.trim(),
     );
   } else {
-    await BandService().createBand(
+    wearerUid = await BandService().createBand(
       deviceId: widget.deviceId,
       bandName: bandNameController.text.trim(),
       wearerName: fullNameController.text.trim(),
@@ -200,7 +202,19 @@ print("Finish Setup pressed");
 
   debugPrint("Band created successfully.");
 
+
+  if (profileImage != null) {
+    try {
+      await LocalPhotoStore.savePhoto(wearerUid, profileImage!);
+      debugPrint("Profile photo saved for wearerUid=$wearerUid");
+    } catch (e) {
+      debugPrint("Failed to save profile photo: $e");
+      
+    }
+  }
+
   // STEP 2: Send WiFi credentials to ESP32
+  
   bool sent = await WifiScanService().sendWifiCredentials(
     device,
     selectedWifi!,

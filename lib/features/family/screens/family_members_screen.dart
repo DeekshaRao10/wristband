@@ -12,7 +12,6 @@ import '../../../core/services/wearer_resolver.dart';
 import '../../bands/screens/band_detail_screen.dart';
 import '../../bands/screens/notifications_screen.dart';
 import '../../pairing/screens/pair_scan_screen.dart';
-import '../../settings/screens/settings_screen.dart';
 
 class FamilyMembersScreen extends StatelessWidget {
   final String familyId;
@@ -26,9 +25,6 @@ class FamilyMembersScreen extends StatelessWidget {
     required this.inviteCode,
   });
 
-  // Opens the phone's native share sheet (WhatsApp, SMS, email, etc.)
-  // directly with the invite code, instead of showing a bottom sheet
-  // with just a copy button — one tap to actually send it to someone.
   Future<void> _shareInviteCode(BuildContext context) async {
     await Share.share(
       'Join my family "$familyName" on SafeBand!\n\n'
@@ -54,11 +50,6 @@ class FamilyMembersScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          // Same real notification history as the Dashboard bell — backed
-          // by families/{familyId}/alerts, with a live count badge (like
-          // a phone/messaging app icon) showing how many alerts are
-          // currently unresolved, instead of the old static
-          // "No new notifications" snackbar that never reflected anything.
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('families')
@@ -174,8 +165,6 @@ class FamilyMembersScreen extends StatelessWidget {
 
                 final members = [...snapshot.data!.docs];
 
-                // Admin always shown first, regardless of Firestore's
-                // (otherwise arbitrary) query order.
                 members.sort((a, b) {
                   final aIsAdmin =
                       (a.data() as Map<String, dynamic>)['role'] == 'Admin';
@@ -240,13 +229,6 @@ class FamilyMembersScreen extends StatelessWidget {
 
                     final rawWearerUid = (data['wearerUid'] ?? '').toString();
 
-                    // Same self-healing lookup as Dashboard/Band Detail —
-                    // bands created before wearerUid existed (or with a
-                    // separate wearer account never linked back) still
-                    // resolve to the real wearer via wearer_resolver.dart.
-                    // No ownerId fallback: that made "You" show on every
-                    // band the admin owns instead of only the one they
-                    // actually wear.
                     return FutureBuilder<String>(
                       future: resolveWearerUid(
                         bandId: doc.id,
@@ -297,25 +279,6 @@ class FamilyMembersScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.pop(context);
-          } else if (index == 2) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            );
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.groups), label: "Family"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.settings), label: "Settings"),
-        ],
-      ),
     );
   }
 }
@@ -351,8 +314,6 @@ class _MemberCard extends StatelessWidget {
     final isWearer = role == 'Wearer';
     final isAdmin = role == 'Admin';
 
-    // memberId IS this member's uid (families/{familyId}/members/{uid}),
-    // so this is a direct, reliable check — no name-string matching needed.
     final isMe = memberId == FirebaseAuth.instance.currentUser?.uid;
     final displayName = isMe ? "You" : name;
 
@@ -373,12 +334,6 @@ class _MemberCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              // Shows a locally-saved photo if one exists for this
-              // member's uid on THIS device — in practice, that's only
-              // ever the currently-signed-in user's own photo (since
-              // photos aren't synced anywhere), so other members'
-              // cards will still show the plain icon unless their
-              // photo also happens to be saved on this same phone.
               LocalAvatar(
                 photoKey: memberId,
                 backgroundColor: AppColors.primary,
@@ -432,8 +387,6 @@ class _MemberCard extends StatelessWidget {
             ],
           ),
 
-          // Notification preferences only make sense for caregivers, not
-          // for the wearer's own card.
           if (!isWearer) ...[
             const SizedBox(height: 12),
             Row(
@@ -527,11 +480,6 @@ class _BandCard extends StatelessWidget {
   }
 }
 
-/// Reads the band's live "lastUpdated" timestamp directly from the
-/// Realtime Database (where the ESP32 writes it every ~5s) and shows
-/// Online/Offline based on how recent it is — this replaces a hardcoded
-/// badge with a real, if approximate, presence indicator. There's no
-/// battery-level display here because the firmware doesn't report one.
 class _OnlineStatusChip extends StatelessWidget {
   final String deviceId;
 
@@ -558,8 +506,6 @@ class _OnlineStatusChip extends StatelessWidget {
           final lastUpdated = (value as num).toInt();
           final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-          // The band uploads roughly every 5 seconds, so anything within
-          // the last 15 seconds is treated as currently online.
           online = (nowEpoch - lastUpdated) < 15;
         }
 

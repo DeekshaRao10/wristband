@@ -1,13 +1,11 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import '../services/local_photo_store.dart';
 import '../theme/app_theme.dart';
 
-/// Drop-in replacement for a plain CircleAvatar(Icon(Icons.person)) that
-/// shows a locally-saved profile photo if one exists for [photoKey]
-/// (a band deviceId or a user uid), falling back to the icon otherwise.
 class LocalAvatar extends StatelessWidget {
   final String photoKey;
   final double radius;
@@ -29,13 +27,22 @@ class LocalAvatar extends StatelessWidget {
     return FutureBuilder<String?>(
       future: LocalPhotoStore.getPhotoPath(photoKey),
       builder: (context, snapshot) {
-        final path = snapshot.data;
+        final data = snapshot.data;
+        Uint8List? bytes;
+
+        if (data != null) {
+          try {
+            bytes = base64Decode(data);
+          } catch (_) {
+            bytes = null;
+          }
+        }
 
         return CircleAvatar(
           radius: radius,
           backgroundColor: backgroundColor,
-          backgroundImage: path != null ? FileImage(File(path)) : null,
-          child: path == null
+          backgroundImage: bytes != null ? MemoryImage(bytes) : null,
+          child: bytes == null
               ? Icon(fallbackIcon, color: iconColor, size: radius)
               : null,
         );

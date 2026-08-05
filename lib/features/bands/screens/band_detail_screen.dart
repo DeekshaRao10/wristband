@@ -58,7 +58,12 @@ class BandDetailScreen extends StatelessWidget {
 
           final stepGoal = band['stepGoal'] ?? 5000;
 
-        
+          // Same self-healing lookup as Dashboard/Family Management —
+          // bands created before wearerUid existed (or with a separate
+          // wearer account never linked back) still resolve to the real
+          // wearer via wearer_resolver.dart. No ownerId fallback: that
+          // made "You" show for the admin on every band they own,
+          // instead of only the one they actually wear.
           return FutureBuilder<String>(
             future: resolveWearerUid(
               bandId: bandId,
@@ -68,6 +73,9 @@ class BandDetailScreen extends StatelessWidget {
             builder: (context, wearerUidSnapshot) {
               final wearerUid = wearerUidSnapshot.data ?? '';
 
+              // Whenever the signed-in account IS the wearer this band
+              // belongs to, show "You" instead of their stored name —
+              // here, in the top bar, and in the status line below.
               final isMe = wearerUid.isNotEmpty &&
                   wearerUid == FirebaseAuth.instance.currentUser?.uid;
               final displayName = isMe ? "You" : wearerName;
@@ -91,8 +99,8 @@ class BandDetailScreen extends StatelessWidget {
                     Expanded(
                       child: _LiveVitals(
                         deviceId: deviceId,
-                        builder:
-                            (context, online, lastSyncText, heartRate, spo2) {
+                        builder: (context, online, lastSyncText, heartRate,
+                            spo2, liveSteps) {
                           return SingleChildScrollView(
                             padding: const EdgeInsets.all(16),
                             child: Column(
@@ -103,7 +111,14 @@ class BandDetailScreen extends StatelessWidget {
                                   online: online,
                                   battery: band['battery'] ?? 100,
                                   lastSyncText: lastSyncText,
-                                  
+                                  // Only offered when nobody's explicitly
+                                  // linked as this band's wearer yet — a
+                                  // deliberate one-tap action, not an
+                                  // automatic guess, so it can't cause
+                                  // the "You shows for everyone" bug
+                                  // again. Once tapped, this band always
+                                  // shows "You" for this account from
+                                  // then on.
                                   showClaimButton: wearerUid.isEmpty,
                                   onClaim: () {
                                     final uid = FirebaseAuth
@@ -123,13 +138,21 @@ class BandDetailScreen extends StatelessWidget {
 
                                 const SizedBox(height: 16),
 
-                                _BloodOxygenCard(spo2: spo2),
+                                _BloodOxygenCard(
+                                  spo2: spo2,
+                                  heartRate: heartRate,
+                                ),
 
                                 const SizedBox(height: 16),
 
                                 _StepsCard(
                                   bandId: bandId,
-                                  steps: band['steps'] ?? 0,
+                                  // Live RTDB step count takes priority
+                                  // over the static (never actually
+                                  // written) Firestore field.
+                                  steps: liveSteps > 0
+                                      ? liveSteps
+                                      : (band['steps'] ?? 0),
                                   goal: stepGoal,
                                 ),
 
@@ -191,7 +214,7 @@ class _DetailAppBar extends StatelessWidget {
           CircleAvatar(
             radius: 12,
             backgroundColor: AppColors.primary,
-            child: const Icon(Icons.watch, color: AppColors.white, size: 14),
+            child: const Icon(Icons.watch, color: AppColors.textOnColor, size: 14),
           ),
           const SizedBox(width: 8),
           Text(
@@ -227,6 +250,7 @@ class _LiveVitals extends StatelessWidget {
     String lastSyncText,
     int heartRate,
     int spo2,
+    int steps,
   ) builder;
 
   const _LiveVitals({required this.deviceId, required this.builder});
@@ -234,7 +258,7 @@ class _LiveVitals extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (deviceId.isEmpty) {
-      return builder(context, false, 'Unknown', 0, 0);
+      return builder(context, false, 'Unknown', 0, 0, 0);
     }
 
     final ref = FirebaseDatabase.instanceFor(
@@ -249,6 +273,10 @@ class _LiveVitals extends StatelessWidget {
         String lastSyncText = 'Unknown';
         int heartRate = 0;
         int spo2 = 0;
+        // Real step count from the band's MPU6050 pedometer, reported
+        // alongside heartRate/spo2 every 5s — same live source, not the
+        // static Firestore 'steps' field that nothing ever wrote to.
+        int steps = 0;
 
         final value = snapshot.data?.snapshot.value;
 
@@ -257,6 +285,7 @@ class _LiveVitals extends StatelessWidget {
 
           heartRate = (data['heartRate'] as num?)?.toInt() ?? 0;
           spo2 = (data['spo2'] as num?)?.toInt() ?? 0;
+          steps = (data['steps'] as num?)?.toInt() ?? 0;
 
           final lastUpdated = (data['lastUpdated'] as num?)?.toInt();
 
@@ -277,7 +306,7 @@ class _LiveVitals extends StatelessWidget {
           }
         }
 
-        return builder(context, online, lastSyncText, heartRate, spo2);
+        return builder(context, online, lastSyncText, heartRate, spo2, steps);
       },
     );
   }
@@ -316,12 +345,12 @@ class _StatusCard extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.circle, size: 8, color: AppColors.white),
+                Icon(Icons.circle, size: 8, color: AppColors.textOnColor),
                 const SizedBox(width: 6),
                 Text(
                   online ? "Band Online" : "Band Offline",
                   style: const TextStyle(
-                    color: AppColors.white,
+                    color: AppColors.textOnColor,
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),
@@ -471,20 +500,22 @@ class _HeartRateCardState extends State<_HeartRateCard>
             ],
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 80,
-            width: double.infinity,
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: _WavePainter(
-                    color: AppColors.primary,
-                    heartRate: heartRate,
-                    phase: _controller.value,
-                  ),
-                );
-              },
+          ClipRect(
+            child: SizedBox(
+              height: 80,
+              width: double.infinity,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  return CustomPaint(
+                    painter: _WavePainter(
+                      color: const Color(0xFF1B5E20), // dark green trace
+                      heartRate: heartRate,
+                      phase: _controller.value,
+                    ),
+                  );
+                },
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -512,13 +543,56 @@ class _HeartRateCardState extends State<_HeartRateCard>
   }
 }
 
-class _BloodOxygenCard extends StatelessWidget {
+class _BloodOxygenCard extends StatefulWidget {
   final int spo2;
+  final int heartRate;
 
-  const _BloodOxygenCard({required this.spo2});
+  const _BloodOxygenCard({required this.spo2, required this.heartRate});
+
+  @override
+  State<_BloodOxygenCard> createState() => _BloodOxygenCardState();
+}
+
+class _BloodOxygenCardState extends State<_BloodOxygenCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: _durationForBpm(widget.heartRate),
+    )..repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _BloodOxygenCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.heartRate != widget.heartRate) {
+      _controller.duration = _durationForBpm(widget.heartRate);
+    }
+  }
+
+  // Pulse-ox waveform pulses in time with the heartbeat, so it's paced off
+  // the same heart rate value as the ECG card — same formula as
+  // _HeartRateCardState so the two traces stay in sync.
+  Duration _durationForBpm(int bpm) {
+    final safeBpm = bpm > 0 ? bpm : 75;
+    final ms = (90000 / safeBpm).round().clamp(600, 3000);
+    return Duration(milliseconds: ms);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final spo2 = widget.spo2;
     final healthy = spo2 == 0 || spo2 >= 95;
 
     return _Card(
@@ -546,6 +620,25 @@ class _BloodOxygenCard extends StatelessWidget {
               fontSize: 32,
               fontWeight: FontWeight.bold,
               color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ClipRect(
+            child: SizedBox(
+              height: 70,
+              width: double.infinity,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  return CustomPaint(
+                    painter: _PlethWavePainter(
+                      color: AppColors.primary,
+                      heartRate: widget.heartRate,
+                      phase: _controller.value,
+                    ),
+                  );
+                },
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -834,13 +927,18 @@ class _WavePainter extends CustomPainter {
     final cycles = (2 + (safeBpm - 50) * 0.05).clamp(2.0, 7.0);
     final cycleWidth = w / cycles;
 
+    // Amplitude scales with how far the reading sits from a calm ~75 bpm —
+    // a low heart rate draws a flatter trace, a high one a taller, more
+    // urgent-looking one. 1.0 at 75 bpm keeps that baseline unchanged.
+    final intensity = (1.0 + (safeBpm - 75) / 100).clamp(0.5, 1.6);
+
     // Base heights for each part of the complex — actual per-beat
     // heights below are these scaled by _beatVariation, so beats vary
     // (some taller, some shorter) instead of every one being identical.
-    final basePWave = h * 0.12;
-    final baseQDip = h * 0.10;
-    final baseRSpike = h * 0.46;
-    final baseSDip = h * 0.22;
+    final basePWave = h * 0.12 * intensity;
+    final baseQDip = h * 0.10 * intensity;
+    final baseRSpike = h * 0.46 * intensity;
+    final baseSDip = h * 0.22 * intensity;
 
     final shift = phase * cycleWidth;
 
@@ -857,7 +955,7 @@ class _WavePainter extends CustomPainter {
 
       // Scale factors in roughly [0.75, 1.25] — enough variation to look
       // natural without any single beat looking broken.
-      final rScale = 0.75 + _beatVariation(beatIndex) * 0.5;
+      final rScale = 0.75 + _beatVariation(beatIndex) * 0.33;
       final pScale = 0.75 + _beatVariation(beatIndex + 100) * 0.5;
       final sScale = 0.75 + _beatVariation(beatIndex + 200) * 0.5;
 
@@ -898,5 +996,112 @@ class _WavePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _WavePainter oldDelegate) =>
+      oldDelegate.phase != phase || oldDelegate.heartRate != heartRate;
+}
+
+/// Plethysmograph-style SpO2 trace: a smooth rounded pulse with a small
+/// dicrotic notch on the downslope, unlike the sharp ECG spike in
+/// _WavePainter — this is what a real pulse-ox waveform looks like.
+class _PlethWavePainter extends CustomPainter {
+  final Color color;
+  final int heartRate;
+  final double phase;
+
+  const _PlethWavePainter({
+    required this.color,
+    required this.heartRate,
+    required this.phase,
+  });
+
+  double _beatVariation(int seed) {
+    final v = math.sin(seed * 12.9898) * 43758.5453;
+    return v - v.floorToDouble();
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final w = size.width;
+    final h = size.height;
+    final baseline = h * 0.82;
+
+    final safeBpm = heartRate > 0 ? heartRate : 75;
+
+    final cycles = (2 + (safeBpm - 50) * 0.05).clamp(2.0, 7.0);
+    final cycleWidth = w / cycles;
+
+    final baseAmp = h * 0.55;
+
+    final shift = phase * cycleWidth;
+
+    final path = Path();
+    double x = -cycleWidth + shift;
+    path.moveTo(x, baseline);
+
+    int beatIndex = -1;
+
+    while (x < w + cycleWidth) {
+      beatIndex++;
+
+      final ampScale = 0.8 + _beatVariation(beatIndex) * 0.3;
+      final amp = baseAmp * ampScale;
+
+      // Flat baseline right before the beat starts.
+      path.lineTo(x + cycleWidth * 0.06, baseline);
+
+      // Fast systolic upstroke to the main peak.
+      path.cubicTo(
+        x + cycleWidth * 0.12,
+        baseline - amp * 0.5,
+        x + cycleWidth * 0.16,
+        baseline - amp,
+        x + cycleWidth * 0.22,
+        baseline - amp,
+      );
+
+      // Sharp fall off the peak toward the dicrotic notch.
+      path.cubicTo(
+        x + cycleWidth * 0.27,
+        baseline - amp * 0.5,
+        x + cycleWidth * 0.30,
+        baseline - amp * 0.42,
+        x + cycleWidth * 0.34,
+        baseline - amp * 0.45,
+      );
+
+      // Small secondary dicrotic bump.
+      path.cubicTo(
+        x + cycleWidth * 0.38,
+        baseline - amp * 0.5,
+        x + cycleWidth * 0.42,
+        baseline - amp * 0.3,
+        x + cycleWidth * 0.48,
+        baseline - amp * 0.22,
+      );
+
+      // Slow diastolic decay back to baseline before the next beat.
+      path.cubicTo(
+        x + cycleWidth * 0.62,
+        baseline - amp * 0.05,
+        x + cycleWidth * 0.80,
+        baseline,
+        x + cycleWidth,
+        baseline,
+      );
+
+      x += cycleWidth;
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PlethWavePainter oldDelegate) =>
       oldDelegate.phase != phase || oldDelegate.heartRate != heartRate;
 }

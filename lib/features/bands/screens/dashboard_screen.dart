@@ -32,19 +32,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final AlertListener _alertListener = AlertListener();
   bool _isListening = false;
 
-  // Keeps the notification bell's badge in sync with the REAL current
-  // fallDetected state — separate from AlertListener's onEmergency
-  // below, which only fires once per rising edge (so it doesn't reopen
-  // the Emergency screen repeatedly). This one just tracks true/false
-  // continuously, so the bell reflects reality even if the Emergency
-  // screen was already dismissed/never opened.
   bool _hasActiveAlert = false;
   StreamSubscription<DatabaseEvent>? _bellSub;
 
-  // The Firestore doc for whichever alert is currently open (if any),
-  // so the RTDB listener below knows which record to mark resolved
-  // once fallDetected clears back to false.
   DocumentReference<Map<String, dynamic>>? _currentAlertDocRef;
+
+  int _selectedIndex = 0;
+
+  late final Future<Map<String, String>> _familyInfoFuture;
+  List<Widget>? _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    _familyInfoFuture = _loadFamilyInfo(user!.uid);
+  }
 
   void _startAlertListener(String bandId) {
     if (_isListening) return;
@@ -65,10 +68,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         );
-
-        // Logs this alert to families/{familyId}/alerts so it shows up
-        // on the real Notifications page — a genuine history, not just
-        // a badge that vanishes the moment the alert resolves.
         try {
           final bandsSnap = await FirebaseFirestore.instance
               .collection('bands')
@@ -103,12 +102,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'bandId': bandsSnap.docs.first.id,
             'deviceId': bandId,
             'wearerName': wearerName,
-            // 'timestamp' is a server-resolved sentinel — it reads back
-            // as null for a brief moment right after the write, which is
-            // what made the Notifications screen show "Just now" instead
-            // of a real time. 'clientTimestamp' is a plain value set the
-            // instant the alert fires, so the exact time is there from
-            // the very first frame it appears in the list.
             'timestamp': FieldValue.serverTimestamp(),
             'clientTimestamp': Timestamp.now(),
             'resolved': false,
@@ -150,8 +143,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  /// Loads the signed-in user's familyId, then the family's name — used
-  /// for the "Smith Family" header instead of a generic title.
   Future<Map<String, String>> _loadFamilyInfo(String uid) async {
     final userDoc =
         await FirebaseFirestore.instance.collection('users').doc(uid).get();
@@ -159,7 +150,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final familyId = userDoc.data()?['familyId'] ?? '';
 
     if (familyId.isEmpty) {
-      return {'familyId': '', 'familyName': ''};
+      return {'familyId': '', 'familyName': '', 'inviteCode': ''};
     }
 
     final familyDoc = await FirebaseFirestore.instance
@@ -170,53 +161,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return {
       'familyId': familyId,
       'familyName': familyDoc.data()?['familyName'] ?? 'Family',
+      'inviteCode': familyDoc.data()?['inviteCode'] ?? '',
     };
-  }
-
-  Future<void> _goToFamilyScreen(BuildContext context) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final userDoc =
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-
-    final familyId = userDoc['familyId'];
-
-    final familyDoc = await FirebaseFirestore.instance
-        .collection('families')
-        .doc(familyId)
-        .get();
-
-    if (!context.mounted) return;
-
-    if (!familyDoc.exists) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Family not found")),
-      );
-      return;
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => FamilyMembersScreen(
-          familyId: familyId,
-          familyName: familyDoc.get('familyName'),
-          inviteCode: familyDoc.get('inviteCode'),
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: FutureBuilder<Map<String, String>>(
-          future: _loadFamilyInfo(user!.uid),
+          future: _familyInfoFuture,
           builder: (context, familySnapshot) {
             if (!familySnapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
@@ -224,200 +179,250 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             final familyId = familySnapshot.data!['familyId'] ?? '';
             final familyName = familySnapshot.data!['familyName'] ?? 'Family';
+            final inviteCode = familySnapshot.data!['inviteCode'] ?? '';
 
-            return Column(
-              children: [
-                _DashboardHeader(
-                  familyName: familyName,
-                  familyId: familyId,
-                ),
+            _tabs ??= <Widget>[
+              _buildHomeTab(familyId, familyName),
+              familyId.isEmpty
+                  ? const Center(child: Text('Join a family first'))
+                  : FamilyMembersScreen(
+                      familyId: familyId,
+                      familyName: familyName,
+                      inviteCode: inviteCode,
+                    ),
+              const SettingsScreen(),
+            ];
 
-                Expanded(
-                  child: familyId.isEmpty
-                      ? const Center(child: Text('No family joined yet'))
-                      : Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: StreamBuilder<QuerySnapshot>(
-                            stream: FirebaseFirestore.instance
-                                .collection('bands')
-                                .where('familyId', isEqualTo: familyId)
-                                .snapshots(),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
-                                );
-                              }
-
-                              if (!snapshot.hasData ||
-                                  snapshot.data!.docs.isEmpty) {
-                                return ListView(
-                                  children: [
-                                    const Padding(
-                                      padding: EdgeInsets.all(20),
-                                      child: Center(
-                                        child: Text("No bands added yet"),
-                                      ),
-                                    ),
-                                    _AddBandCard(
-                                      onTap: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const PairScanScreen(),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }
-
-                              final bands = snapshot.data!.docs;
-
-                              if (bands.isNotEmpty && !_isListening) {
-                                WidgetsBinding.instance
-                                    .addPostFrameCallback((_) {
-                                  if (!mounted) return;
-
-                                  final bandData = bands.first.data()
-                                      as Map<String, dynamic>;
-
-                                  final deviceId = bandData['deviceId'];
-
-                                  _startAlertListener(deviceId);
-                                });
-                              }
-
-                              return ListView.builder(
-                                itemCount: bands.length + 1,
-                                itemBuilder: (context, index) {
-                                  if (index == bands.length) {
-                                    return _StaggeredFadeIn(
-                                      index: index,
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(
-                                            top: 4, bottom: 16),
-                                        child: _AddBandCard(
-                                          onTap: () => Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  const PairScanScreen(),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-
-                                  final bandDoc = bands[index];
-                                  final band =
-                                      bandDoc.data() as Map<String, dynamic>;
-
-                                  final rawWearerUid =
-                                      (band['wearerUid'] ?? '').toString();
-
-                                  return _StaggeredFadeIn(
-                                    index: index,
-                                    child: Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 14),
-                                      // Bands created before the wearerUid
-                                      // field existed (or where a separate
-                                      // wearer account was created but never
-                                      // linked back) need a one-time async
-                                      // lookup to find who the real wearer
-                                      // is — see wearer_resolver.dart. No
-                                      // ownerId fallback here on purpose:
-                                      // that caused "You" to show on every
-                                      // band the admin owns, not just the
-                                      // one they actually wear.
-                                      child: FutureBuilder<String>(
-                                        future: resolveWearerUid(
-                                          bandId: bandDoc.id,
-                                          rawWearerUid: rawWearerUid,
-                                        ),
-                                        initialData: rawWearerUid,
-                                        builder: (context, wearerUidSnapshot) {
-                                          return _BandOverviewCard(
-                                            bandId: bandDoc.id,
-                                            deviceId: band['deviceId'] ?? '',
-                                            name: band['wearerName'] ?? '',
-                                            wearerUid:
-                                                wearerUidSnapshot.data ?? '',
-                                            steps: band['steps'] ?? 0,
-                                            stepGoal: band['stepGoal'] ?? 5000,
-                                            battery: band['battery'] ?? 100,
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                ),
-              ],
+            return AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, animation) =>
+                  FadeTransition(opacity: animation, child: child),
+              layoutBuilder: (currentChild, previousChildren) {
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
+                );
+              },
+              child: KeyedSubtree(
+                key: ValueKey<int>(_selectedIndex),
+                child: _tabs![_selectedIndex],
+              ),
             );
           },
         ),
       ),
-      // Floating rounded pill instead of a flat edge-to-edge bar — lifts
-      // off the background with its own shadow and margin, matching the
-      // rounded-card language used everywhere else on this screen.
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      bottomNavigationBar: SafeArea(
+        top: false,
         child: Container(
+          height: 64,
+          width: double.infinity,
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withOpacity(0.10),
                 blurRadius: 20,
-                offset: const Offset(0, 8),
+                offset: const Offset(0, -4),
               ),
             ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BottomNavigationBar(
-              currentIndex: 0,
-              backgroundColor: AppColors.white,
-              elevation: 0,
-              selectedItemColor: AppColors.primary,
-              unselectedItemColor: AppColors.mutedText,
-              onTap: (index) async {
-                if (index == 1) {
-                  await _goToFamilyScreen(context);
-                } else if (index == 2) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  );
-                }
+          child: LayoutBuilder(
+              builder: (context, constraints) {
+                final itemWidth = constraints.maxWidth / 3;
+                const indicatorWidth = 28.0;
+
+                return Stack(
+                  children: [
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                      left: itemWidth * _selectedIndex +
+                          (itemWidth - indicatorWidth) / 2,
+                      bottom: 6,
+                      child: Container(
+                        width: indicatorWidth,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        _navItem(0, Icons.home, "Home"),
+                        _navItem(1, Icons.groups, "Family"),
+                        _navItem(2, Icons.settings, "Settings"),
+                      ],
+                    ),
+                  ],
+                );
               },
-              items: const [
-                BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.groups), label: "Family"),
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.settings), label: "Settings"),
-              ],
             ),
           ),
+        ),
+    );
+  }
+
+  Widget _navItem(int index, IconData icon, String label) {
+    final selected = _selectedIndex == index;
+    final color = selected ? AppColors.primary : AppColors.mutedText;
+
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _selectedIndex = index),
+        borderRadius: BorderRadius.circular(28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+
+  Widget _buildHomeTab(String familyId, String familyName) {
+    return Column(
+      children: [
+        _DashboardHeader(
+          familyName: familyName,
+          familyId: familyId,
+        ),
+        Expanded(
+          child: familyId.isEmpty
+              ? const Center(child: Text('No family joined yet'))
+              : Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('bands')
+                        .where('familyId', isEqualTo: familyId)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return ListView(
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Center(
+                                child: Text("No bands added yet"),
+                              ),
+                            ),
+                            _AddBandCard(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PairScanScreen(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      final bands = snapshot.data!.docs;
+
+                      if (bands.isNotEmpty && !_isListening) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
+
+                          final bandData =
+                              bands.first.data() as Map<String, dynamic>;
+
+                          final deviceId = bandData['deviceId'];
+
+                          _startAlertListener(deviceId);
+                        });
+                      }
+
+                      return ListView.builder(
+                        itemCount: bands.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == bands.length) {
+                            return _StaggeredFadeIn(
+                              index: index,
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                    top: 4, bottom: 16),
+                                child: _AddBandCard(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const PairScanScreen(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          final bandDoc = bands[index];
+                          final band = bandDoc.data() as Map<String, dynamic>;
+
+                          final rawWearerUid =
+                              (band['wearerUid'] ?? '').toString();
+
+                          return _StaggeredFadeIn(
+                            index: index,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: FutureBuilder<String>(
+                                future: resolveWearerUid(
+                                  bandId: bandDoc.id,
+                                  rawWearerUid: rawWearerUid,
+                                ),
+                                initialData: rawWearerUid,
+                                builder: (context, wearerUidSnapshot) {
+                                  return _BandOverviewCard(
+                                    bandId: bandDoc.id,
+                                    deviceId: band['deviceId'] ?? '',
+                                    name: band['wearerName'] ?? '',
+                                    wearerUid: wearerUidSnapshot.data ?? '',
+                                    steps: band['steps'] ?? 0,
+                                    stepGoal: band['stepGoal'] ?? 5000,
+                                    battery: band['battery'] ?? 100,
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
 }
 
-/// Time-of-day greeting ("Good morning" / "Good afternoon" / "Good
-/// evening") — small personal touch that makes the dashboard feel
-/// alive rather than a static label every time it's opened.
 String _greeting() {
   final hour = DateTime.now().hour;
   if (hour < 12) return "Good morning";
@@ -425,9 +430,6 @@ String _greeting() {
   return "Good evening";
 }
 
-/// Curved gradient banner instead of a flat row on the plain
-/// background — gives the dashboard a distinct identity at a glance
-/// instead of looking like any other list screen.
 class _DashboardHeader extends StatelessWidget {
   final String familyName;
   final String familyId;
@@ -439,9 +441,6 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Plain background (matches the rest of the page) instead of the
-    // colored gradient banner — just the greeting/family name/bell,
-    // no colored surface behind it.
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
@@ -481,11 +480,6 @@ class _DashboardHeader extends StatelessWidget {
               ],
             ),
           ),
-          // Real count badge — number of currently-unresolved fall
-          // alerts for this family, straight from
-          // families/{familyId}/alerts, not just an on/off dot. Updates
-          // live: goes up the instant a new alert is logged, down the
-          // instant one is marked resolved.
           StreamBuilder<QuerySnapshot>(
             stream: familyId.isEmpty
                 ? null
@@ -497,11 +491,6 @@ class _DashboardHeader extends StatelessWidget {
                     .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                // Surfaces a permissions/rules problem instead of just
-                // quietly showing zero — if this fires, it's almost
-                // certainly Firestore security rules blocking reads on
-                // families/{familyId}/alerts (a brand-new collection),
-                // not a data problem.
                 debugPrint("Dashboard: bell badge stream error: ${snapshot.error}");
                 return IconButton(
                   icon: const Icon(Icons.error_outline, color: Colors.orange),
@@ -537,11 +526,6 @@ class _DashboardHeader extends StatelessWidget {
                         return;
                       }
 
-                      // Opens the real Notifications page instead of a
-                      // one-off snackbar — every fall alert ever logged
-                      // for this family, so tapping the bell after a
-                      // "Fall Detected" popup actually shows it there
-                      // too.
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -589,8 +573,6 @@ class _DashboardHeader extends StatelessWidget {
   }
 }
 
-/// One family member's card: photo, name, live status, live heart rate,
-/// step gauge, and a sync/last-movement/battery footer.
 class _BandOverviewCard extends StatelessWidget {
   final String bandId;
   final String deviceId;
@@ -647,10 +629,6 @@ class _BandOverviewCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    // Colored ring around the photo doubles as a
-                    // status indicator at a glance (green = all well,
-                    // red = fall detected) — same info as the dot/text
-                    // below, just visible from across the room.
                     Container(
                       padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
@@ -662,11 +640,6 @@ class _BandOverviewCard extends StatelessWidget {
                           width: 2.5,
                         ),
                       ),
-                      // Shows the wearer's locally-saved photo if one
-                      // exists (only on the same phone that saved it —
-                      // photos aren't synced anywhere). Falls back to
-                      // the plain icon otherwise, same as Family
-                      // Management.
                       child: LocalAvatar(
                         photoKey: wearerUid,
                         radius: 22,
@@ -716,9 +689,7 @@ class _BandOverviewCard extends StatelessWidget {
                     const Icon(Icons.chevron_right, color: AppColors.mutedText),
                   ],
                 ),
-
                 const SizedBox(height: 14),
-
                 Row(
                   children: [
                     Expanded(
@@ -794,9 +765,7 @@ class _BandOverviewCard extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -819,10 +788,6 @@ class _BandOverviewCard extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 2),
-                          // No accelerometer/motion field in the firmware
-                          // payload yet — reusing the same upload
-                          // timestamp here until real motion tracking
-                          // exists, same as on the Band Detail screen.
                           Row(
                             children: [
                               const Icon(Icons.timeline,
@@ -887,12 +852,6 @@ String _formatSteps(int steps) {
   return "$steps";
 }
 
-/// Fades and slides a card in on first build, staggered by list index —
-/// each band card (and the trailing "Add band" card) animates in a
-/// beat after the one before it instead of the whole list just
-/// appearing at once. Purely a one-time entrance effect; it doesn't
-/// replay on every rebuild since the delay only fires once in
-/// initState.
 class _StaggeredFadeIn extends StatefulWidget {
   final int index;
   final Widget child;
@@ -944,9 +903,6 @@ class _StaggeredFadeInState extends State<_StaggeredFadeIn>
   }
 }
 
-/// Streams bands/{deviceId} from RTDB and exposes heartRate, fallDetected
-/// and a human-readable "X ago" string derived from lastUpdated — the
-/// same live source the Band Detail screen uses, so the numbers agree.
 class _LiveBandStats extends StatelessWidget {
   final String deviceId;
   final Widget Function(
@@ -1043,8 +999,6 @@ class _AddBandCard extends StatelessWidget {
   }
 }
 
-/// Decorative semicircle "speedometer" gauge for the steps box — filled
-/// proportionally to steps/stepGoal.
 class _GaugePainter extends CustomPainter {
   final double progress;
 
@@ -1060,9 +1014,6 @@ class _GaugePainter extends CustomPainter {
       ..strokeWidth = 6
       ..strokeCap = StrokeCap.round;
 
-    // Gradient stroke (amber -> orange) instead of a flat single color —
-    // small touch, but it's what makes this gauge look like a deliberate
-    // design choice rather than a default progress bar.
     final fgPaint = Paint()
       ..shader = const SweepGradient(
         colors: [Colors.amber, Colors.deepOrange],

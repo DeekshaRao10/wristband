@@ -30,7 +30,7 @@ class BandService {
     });
   }
 
-  Future<void> createBand({
+  Future<String> createBand({
     required String deviceId,
     required String bandName,
     required String wearerName,
@@ -62,13 +62,6 @@ class BandService {
     if (existingBand.docs.isNotEmpty) {
       throw Exception("This band is already registered.");
     }
-
-    // Create band. wearerUid defaults to the admin's own uid — covers
-    // the "You" case (the person setting this up is the one wearing the
-    // band). If a separate wearer account gets created below, this is
-    // updated to that wearer's uid instead. Screens compare this against
-    // FirebaseAuth.instance.currentUser?.uid to show "You" instead of a
-    // name wherever the wearer is displayed.
     final bandRef = await firestore.collection('bands').add({
       'deviceId': deviceId,
       'ownerId': user.uid,
@@ -132,8 +125,7 @@ print("Wearer UID = ${wearerCredential.user!.uid}");
 
 final wearerUid = wearerCredential.user!.uid;
 
-        // A separate wearer account was created — this band's wearer is
-        // no longer the admin, so correct wearerUid to point at them.
+      
         await bandRef.update({'wearerUid': wearerUid});
 
         // Create wearer user document
@@ -152,12 +144,6 @@ final wearerUid = wearerCredential.user!.uid;
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // Also add the wearer to the FAMILY's members subcollection — this
-        // was missing before, which meant a wearer created here would never
-        // show up in FamilyMembersScreen (which only reads
-        // families/{familyId}/members). Without this, only Admin/Member
-        // accounts created via family_service.dart's createFamily/joinFamily
-        // ever appeared in the members list.
         if (familyId != null &&
             familyId.toString().isNotEmpty) {
           await firestore
@@ -176,6 +162,8 @@ final wearerUid = wearerCredential.user!.uid;
         }
 
         await secondaryAuth.signOut();
+
+        return wearerUid;
       } on FirebaseAuthException catch (e) {
   print("==================================");
   print("FirebaseAuthException");
@@ -196,5 +184,27 @@ final wearerUid = wearerCredential.user!.uid;
   rethrow;
 }
         }
+
+  
+    return user.uid;
   }
 }
+
+
+//User Registers Band
+        
+//Get Logged-in User
+        
+//Get Family ID
+        
+//Check Duplicate Band
+       
+//Create Band Document
+//Add OWNER
+        
+//Create Wearer Firebase Account
+//Update Band with Wearer UID
+//Create Wearer User Document
+//Add WEARER to bandMembers
+//Add WEARER to Family
+//Return Wearer UID
