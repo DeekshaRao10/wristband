@@ -25,6 +25,7 @@ The wearable continuously collects sensor readings and processes them on the ESP
 
 When a fall is confirmed, the ESP32 changes the wearable to an emergency state and uploads the relevant information to Firebase through Wi-Fi. The Flutter application provides the family-side interface for viewing the wearable information and emergency status.
 
+
 🎯 Project Objectives
 
 🛡️ Provide a wearable safety-monitoring solution.
@@ -79,6 +80,7 @@ The Flutter application provides the family-side interface for viewing the weara
 
 Bluetooth Low Energy is used during initial configuration to provide Wi-Fi credentials, Firebase information, and the Band ID.
 
+
 🏗️ System Architecture
 
                     👤 WEARER
@@ -125,6 +127,7 @@ Bluetooth Low Energy is used during initial configuration to provide Wi-Fi crede
                        ▼
                   👨‍👩‍👧 FAMILY
 
+
 🔄 How SafeBand Works
 
 📡 1. Sensors collect data
@@ -150,6 +153,7 @@ Bluetooth Low Energy is used during initial configuration to provide Wi-Fi crede
 🧠 Machine Learning – Fall Detection
 
 The MPU6050 continuously provides acceleration and gyroscope readings. The ESP32 maintains a motion window and extracts 22 features from the acceleration data.
+
 
 📊 Features Used
 
@@ -208,6 +212,7 @@ Rotation Stillness Barometric
 
 This multi-stage process is designed to reduce false alarms compared with relying on a single threshold or sensor reading.
 
+
 🔧 Hardware Components
 
 🔩 Component
@@ -233,6 +238,7 @@ Temperature, pressure and environmental measurements
 🔋 Battery / Power Supply
 
 Portable power for the wearable
+
 
 💻 Technology Stack
 
@@ -382,6 +388,7 @@ SCL → GPIO 13
 
 💡 Note: Use the appropriate voltage for the sensor modules and connect all required grounds correctly.
 
+
 📂 Project Structure
 
 SafeBand/
@@ -406,6 +413,7 @@ SafeBand/
 │   └── pubspec.yaml
 │
 └── 📄 README.md
+
 
 ⚙️ Setup & Installation
 
