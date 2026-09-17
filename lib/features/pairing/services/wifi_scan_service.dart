@@ -10,6 +10,32 @@ class WifiScanService {
   static const String wifiWriteUuid =
       "12345678-1234-1234-1234-123456789003";
 
+  static const String savedNetworksUuid =
+      "12345678-1234-1234-1234-123456789004";
+
+  /// SSIDs the band already has saved (not just what it's connected to
+  /// right now) — lets the UI confirm an older network wasn't dropped
+  /// when a new one gets added via Change WiFi.
+  Future<List<String>> getSavedNetworks(BluetoothDevice device) async {
+    List<BluetoothService> services = await device.discoverServices();
+
+    for (BluetoothService service in services) {
+      if (service.uuid.toString() != serviceUuid) continue;
+
+      for (BluetoothCharacteristic characteristic in service.characteristics) {
+        if (characteristic.uuid.toString() != savedNetworksUuid) continue;
+
+        List<int> value = await characteristic.read();
+        String raw = String.fromCharCodes(value).trim();
+
+        if (raw.isEmpty) return [];
+        return raw.split(",");
+      }
+    }
+
+    return [];
+  }
+
 Future<List<String>> getWifiList(
     BluetoothDevice device) async {
 

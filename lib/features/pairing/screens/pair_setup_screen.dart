@@ -93,9 +93,6 @@ Future<void> pickProfileImage() async {
     });
   }
 }
-
-
-
 Future<void> loadWifiNetworks() async {
 
   final device =

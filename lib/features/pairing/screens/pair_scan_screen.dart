@@ -167,15 +167,6 @@ class _PairScanScreenState extends State<PairScanScreen> {
 
             const SizedBox(height: 25),
 
-            if (scanning)
-              const Column(
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 10),
-                  Text("Searching..."),
-                ],
-              ),
-
             const SizedBox(height: 20),
 
             if (!scanning && devices.isNotEmpty)
@@ -194,7 +185,16 @@ class _PairScanScreenState extends State<PairScanScreen> {
 
             Expanded(
               child: scanning
-                  ? const SizedBox()
+                  ? const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 10),
+                          Text("Searching..."),
+                        ],
+                      ),
+                    )
                   : devices.isEmpty
                       ? const Center(
                           child: Column(
@@ -242,13 +242,7 @@ class _PairScanScreenState extends State<PairScanScreen> {
                         ),
             ),
 
-            TextButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.keyboard),
-              label: const Text(
-                "Enter code manually",
-              ),
-            ),
+            
           ],
         ),
       ),

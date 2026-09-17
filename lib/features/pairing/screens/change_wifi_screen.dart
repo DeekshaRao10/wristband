@@ -38,6 +38,7 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
   BluetoothDevice? connectedDevice;
   bool loadingWifiList = false;
   List<String> wifiNetworks = [];
+  List<String> savedNetworks = [];
   String? selectedWifi;
   bool sending = false;
 
@@ -90,7 +91,7 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
       // below only appears as a fallback if this doesn't find a match.
       if (!autoConnectAttempted && connectedDevice == null) {
         final match = filtered.where(
-          (r) => r.device.platformName.startsWith('SafeBand'),
+          (r) => r.device.platformName.toLowerCase().startsWith('safeband'),
         );
 
         if (match.isNotEmpty) {
@@ -131,12 +132,19 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
         connectFailed = false;
       });
 
-      final wifiList = await WifiScanService().getWifiList(device);
+      final wifiService = WifiScanService();
+      final wifiList = await wifiService.getWifiList(device);
+      final saved = await wifiService.getSavedNetworks(device);
 
       if (!mounted) return;
 
       setState(() {
         wifiNetworks = wifiList
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList();
+        savedNetworks = saved
             .map((e) => e.trim())
             .where((e) => e.isNotEmpty)
             .toSet()
@@ -233,24 +241,26 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
     // Still searching, or found a match and connecting to it — show a
     // single "connecting" state instead of a device list.
     if (!connectFailed) {
-      return const Padding(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              "Connecting to your band...",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            SizedBox(height: 6),
-            Text(
-              "Make sure it's charged and nearby.",
-              textAlign: TextAlign.center,
-            ),
-          ],
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                "Connecting to your band...",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              SizedBox(height: 6),
+              Text(
+                "Make sure it's charged and nearby.",
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -315,6 +325,43 @@ class _ChangeWifiScreenState extends State<ChangeWifiScreen> {
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 15),
+
+          if (!loadingWifiList && savedNetworks.isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.primary.withOpacity(.25)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.wifi, size: 16, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Already saved on this band (${savedNetworks.length})",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    savedNetworks.join(", "),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+          ],
 
           if (loadingWifiList) const Center(child: CircularProgressIndicator()),
 
