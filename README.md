@@ -1,183 +1,175 @@
 🛡️ SafeBand
 
-💚 Smart Wearable for Safety and Health Monitoring
+Smart Wearable for Safety and Health Monitoring
 
-SafeBand is an IoT-based smart wearable system that monitors movement and health-related information, detects possible falls using Machine Learning, and helps family members monitor the wearer through a Flutter mobile application.
+A smart wearable system for movement monitoring, Machine Learning
+based fall detection, basic health monitoring, and family-side
+monitoring through a Flutter application.
 
-📌 Project Overview
+📖 About the Project
 
-SafeBand is designed as a wearable safety system using an ESP32 as the main controller. The device collects data from the MPU6050 accelerometer and gyroscope, an analog Pulse Sensor, and a BMP280/BME280 sensor. The ESP32 processes the sensor data locally and uses a Random Forest Machine Learning model for fall detection.
+SafeBand is an IoT-based wearable safety system built using an
+ESP32, MPU6050, analog Pulse Sensor, BMP280/BME280,
+Random Forest Machine Learning, Wi-Fi, Firebase Realtime
+Database, Bluetooth Low Energy (BLE), and Flutter.
 
-When a possible fall is detected, the system performs additional confirmation using impact, wrist rotation, post-impact stillness, and barometric information. If the fall is confirmed, the ESP32 changes the system to an emergency state and uploads the relevant information to Firebase Realtime Database through Wi-Fi. The Flutter mobile application provides the family member with the wearable's information and emergency status.
+The ESP32 continuously collects sensor data and processes the
+information locally. The MPU6050 is used to monitor acceleration and
+gyroscope data for fall detection. A Random Forest model is used to
+classify motion data, while additional conditions such as impact,
+rotation, stillness, and barometric change are used to confirm a
+possible fall. Confirmed fall information is uploaded to Firebase
+through Wi-Fi and can be monitored through the Flutter application.
 
 🎯 Objectives
 
-🛡️ Provide a smart wearable safety solution.
+🛡️ Develop a smart wearable safety system.
 
 🧠 Detect falls using Machine Learning.
 
-📐 Monitor movement using an accelerometer and gyroscope.
+📐 Monitor movement using the MPU6050.
 
-❤️ Monitor heart rate using a Pulse Sensor.
+❤️ Monitor heart rate using an analog Pulse Sensor.
 
-🌡️ Monitor temperature and pressure.
+🌡️ Monitor temperature and pressure using BMP280/BME280.
 
-☁️ Store wearable data in Firebase.
+☁️ Store wearable information in Firebase.
 
-📱 Provide a mobile monitoring application.
+📱 Provide a Flutter-based monitoring application.
 
-🔵 Configure the wearable using Bluetooth Low Energy.
+🔵 Provide BLE-based device provisioning.
 
 🚨 Provide an emergency status after a confirmed fall.
 
 ⭐ Key Features
 
-Feature
+Feature                             Description
 
-Description
+🧠 Machine Learning Fall          Random Forest model for motion
+Detection                         classification
 
-🧠 ML Fall Detection
+📐 Motion Monitoring            MPU6050 accelerometer and gyroscope
 
-Random Forest model classifies motion data
+❤️ Heart-Rate Monitoring        Analog Pulse Sensor
 
-📐 Motion Monitoring
+🌡️ Environmental Monitoring     BMP280/BME280 temperature and
+pressure data
 
-MPU6050 monitors acceleration and rotation
+🚨 Fall Confirmation            Multiple motion and barometric
+checks
 
-❤️ Heart-Rate Monitoring
+📶 Wi-Fi Communication          ESP32 to Firebase communication
 
-Analog Pulse Sensor monitors heart-rate activity
+☁️ Firebase Database            Stores wearable and emergency
+information
 
-🌡️ Environmental Monitoring
+📱 Flutter Application          Family-side monitoring interface
 
-BMP280/BME280 provides temperature and pressure data
-
-🚨 Fall Confirmation
-
-Uses multiple signals to confirm a possible fall
-
-📶 Wi-Fi Communication
-
-ESP32 communicates with Firebase
-
-☁️ Firebase Database
-
-Stores wearable and emergency information
-
-📱 Flutter App
-
-Provides family-side monitoring
-
-🔵 BLE Provisioning
-
-Used for initial device configuration
+🔵 BLE Provisioning             Initial device configuration
 
 🏗️ System Architecture
 
-                         👤 WEARER
-                            │
-                            ▼
-                   ┌─────────────────┐
-                   │  ⌚ SafeBand     │
-                   │     Sensors     │
-                   └────────┬────────┘
-                            │
-             ┌──────────────┼──────────────┐
-             │              │              │
-             ▼              ▼              ▼
-        📐 MPU6050      ❤️ Pulse      🌡️ BMP/BME280
-        Motion Sensor    Sensor        Environment
-             │              │              │
-             └──────────────┼──────────────┘
-                            ▼
-                   ┌─────────────────┐
-                   │     🧠 ESP32    │
-                   │                 │
-                   │ Sensor Reading  │
-                   │ Feature Extract │
-                   │ Random Forest   │
-                   │ Fall Confirm.   │
-                   └────────┬────────┘
-                            │
-                         📶 Wi-Fi
-                            │
-                            ▼
-                   ┌─────────────────┐
-                   │ ☁️ Firebase     │
-                   │ Realtime DB     │
-                   └────────┬────────┘
-                            │
-                            ▼
-                   ┌─────────────────┐
-                   │ 📱 Flutter App  │
-                   │                 │
-                   │ Health Data     │
-                   │ Fall Status     │
-                   │ Family View     │
-                   └────────┬────────┘
-                            │
-                            ▼
-                     👨‍👩‍👧 FAMILY
+                    👤 WEARER
+                       │
+                       ▼
+              ┌──────────────────┐
+              │  ⌚ SAFEBAND      │
+              │     SENSORS      │
+              └────────┬─────────┘
+                       │
+          ┌────────────┼────────────┐
+          │            │            │
+          ▼            ▼            ▼
+      📐 MPU6050    ❤️ Pulse    🌡️ BMP/BME280
+      Motion        Sensor      Environment
+          │            │            │
+          └────────────┼────────────┘
+                       ▼
+              ┌──────────────────┐
+              │     🧠 ESP32     │
+              │                  │
+              │ Sensor Processing│
+              │ Feature Extraction│
+              │ Random Forest    │
+              │ Fall Confirmation│
+              └────────┬─────────┘
+                       │
+                       │ 📶 Wi-Fi
+                       ▼
+              ┌──────────────────┐
+              │ ☁️ Firebase RTDB │
+              └────────┬─────────┘
+                       │
+                       ▼
+              ┌──────────────────┐
+              │  📱 Flutter App  │
+              │                  │
+              │ Health Data      │
+              │ Fall Status      │
+              └────────┬─────────┘
+                       │
+                       ▼
+                 👨‍👩‍👧 FAMILY
 
-🔄 How SafeBand Works
+🔄 Working Principle
 
-📡 Sensors collect data
-          ↓
-🧠 ESP32 receives sensor readings
-          ↓
-📊 Motion data is processed
-          ↓
-🔢 22 motion features are extracted
-          ↓
-🤖 Random Forest predicts possible fall
-          ↓
-🔍 Additional confirmation is performed
-          ↓
-🚨 Fall confirmed
-          ↓
-📶 Data uploaded through Wi-Fi
-          ↓
-☁️ Firebase stores the information
-          ↓
-📱 Flutter application displays the status
-          ↓
-👨‍👩‍👧 Family member monitors the wearer
+📡 Sensor Data
+      ↓
+🧠 ESP32 Processing
+      ↓
+📊 Feature Extraction
+      ↓
+🤖 Random Forest Prediction
+      ↓
+🔍 Fall Confirmation
+      ↓
+🚨 Emergency State
+      ↓
+📶 Wi-Fi
+      ↓
+☁️ Firebase Realtime Database
+      ↓
+📱 Flutter Application
+      ↓
+👨‍👩‍👧 Family Monitoring
 
-🧠 Machine Learning – Fall Detection
+🧠 Machine Learning -- Fall Detection
 
-The MPU6050 continuously provides acceleration and gyroscope readings. The ESP32 maintains a motion window and extracts 22 features from the acceleration data.
+The MPU6050 provides acceleration and gyroscope readings. The ESP32
+processes the motion information using a rolling window and calculates
+22 features.
 
-📊 Features
+📊 Motion Features
 
 The feature vector contains:
 
-📈 Mean
+Mean
 
-📉 Standard deviation
+Standard deviation
 
-🔽 Minimum
+Minimum
 
-🔼 Maximum
+Maximum
 
-↔️ Range
+Range
 
-📊 25th percentile
+25th percentile
 
-📊 75th percentile
+75th percentile
 
-📐 Skewness
+Skewness
 
-📐 Kurtosis
+Kurtosis
 
-√ RMS
+RMS
 
-📐 X-axis statistics
+X-axis statistics
 
-📐 Y-axis statistics
+Y-axis statistics
 
-📐 Z-axis statistics
+Z-axis statistics
 
-The trained model is deployed to the ESP32 as:
+The trained Random Forest model is deployed to the ESP32 as:
 
 fall_model.h
 
@@ -187,48 +179,37 @@ Sustained Free-Fall
         +
       Impact
         ↓
-Motion Window Captured
+ Motion Window
         ↓
-22 Features Extracted
+22 Feature Extraction
         ↓
 Random Forest Prediction
         ↓
-Additional Evidence
-   ┌────┼─────────┐
-   │    │         │
-Rotation Stillness Barometric
-   │    │         │
-   └────┼─────────┘
+Additional Confirmation
         ↓
-  🚨 Confirmed Fall
+┌─────────┬──────────┬─────────────┐
+│ Rotation│ Stillness│ Barometric  │
+└─────────┴──────────┴─────────────┘
+        ↓
+🚨 CONFIRMED FALL
 
-The additional confirmation stage helps reduce false alarms by considering more than one indication of a fall.
+The additional confirmation stage is used to reduce false fall
+detections.
 
 🔧 Hardware Components
 
-🔩 Component
+Component                           Purpose
 
-🎯 Purpose
+🧠 ESP32                        Main controller and processing unit
 
-ESP32
+📐 MPU6050                      Accelerometer and gyroscope
 
-Main controller and communication
+❤️ Analog Pulse Sensor          Heart-rate monitoring
 
-MPU6050
+🌡️ BMP280/BME280                Temperature and
+pressure/environmental monitoring
 
-Accelerometer + gyroscope for movement/fall detection
-
-Analog Pulse Sensor
-
-Heart-rate monitoring
-
-BMP280/BME280
-
-Temperature and pressure/environmental monitoring
-
-Battery / Power Supply
-
-Provides portable power
+🔋 Battery / Power Supply       Portable power
 
 💻 Technology Stack
 
@@ -240,7 +221,7 @@ C/C++
 
 Arduino Framework
 
-PlatformIO
+PlatformIO / Arduino IDE
 
 I²C
 
@@ -248,11 +229,11 @@ GPIO
 
 🤖 Machine Learning
 
-Random Forest
-
 Python
 
 Scikit-learn
+
+Random Forest
 
 Embedded model: fall_model.h
 
@@ -262,11 +243,11 @@ Flutter
 
 Dart
 
-☁️ Cloud
-
-Firebase Realtime Database
+☁️ Backend & Database
 
 Firebase Authentication
+
+Firebase Realtime Database
 
 📡 Communication
 
@@ -278,7 +259,8 @@ Bluetooth Low Energy (BLE)
 
 📶 Wi-Fi
 
-Wi-Fi is used to send processed sensor information and emergency status from the ESP32 to Firebase.
+Wi-Fi is used to send processed sensor information and emergency status
+from the ESP32 to Firebase.
 
 🧠 ESP32
    │
@@ -288,72 +270,77 @@ Wi-Fi is used to send processed sensor information and emergency status from the
 
 🔵 Bluetooth Low Energy
 
-BLE is used mainly for initial configuration of the wearable.
+BLE is mainly used for initial device provisioning.
 
 📱 Mobile
-    │
-    │ BLE
-    ▼
+   │
+   │ BLE
+   ▼
 🧠 ESP32
-    │
-    ▼
+   │
+   ▼
 💾 Save Configuration
-    │
-    ▼
-📶 Connect to Wi-Fi
+   │
+   ▼
+📶 Wi-Fi
 
 ☁️ Firebase Integration
 
-Firebase Realtime Database acts as the cloud data layer for SafeBand.
+Firebase Realtime Database acts as the cloud data layer of SafeBand.
 
-The ESP32 authenticates with Firebase and uploads information associated with the configured Band ID.
+The ESP32 authenticates with Firebase and uploads information associated
+with the configured Band ID.
 
-📊 Data Stored
+📊 Data
 
-❤️ heartRate
-🫁 spo2
-🚨 fallDetected
-👣 steps
-📌 status
-🌡️ temperature
-💨 pressure
-💧 humidity
-📉 baroDropM
-🔍 baroConfirm
-🔧 sensor status
-⏱️ lastUpdated
+❤️ Heart Rate
+🫁 SpO₂ Field
+🚨 Fall Detected
+👣 Steps
+📌 Status
+🌡️ Temperature
+💨 Pressure
+💧 Humidity
+📉 Barometric Fall Information
+🔧 Sensor Status
+⏱️ Last Updated
 
-⚠️ Note: In the current firmware, the SpO₂ value is a simulated placeholder because the current hardware uses an analog Pulse Sensor rather than a dedicated red/IR SpO₂ sensor.
+⚠️ Current Firmware Note: The current firmware contains an SpO₂
+field, but it is a simulated placeholder because the current hardware
+uses an analog Pulse Sensor rather than a dedicated red/IR SpO₂
+sensor.
 
-📱 Flutter Mobile Application
+📱 Flutter Application
 
-The Flutter application is the family-side interface of SafeBand.
+The Flutter application provides the family-side monitoring interface.
 
-It is designed to provide:
+It can display:
 
-👤 User and family information
+👤 User/family information
 
 ❤️ Health-related readings
 
-📊 Wearable status
+📊 Wearable information
 
 🚨 Fall/emergency status
 
 🔄 Updated information from Firebase
 
-👨‍👩‍👧 Family monitoring
-
-The fall-detection computation is performed on the ESP32, while the Flutter application is used for monitoring and displaying the information.
+The fall-detection computation is performed on the ESP32. The
+Flutter application is used for monitoring and displaying the
+information.
 
 🔵 BLE Provisioning
 
-During the initial setup, configuration information can be provided to the ESP32 through BLE.
+During initial setup, the ESP32 can receive configuration information
+through BLE.
 
 📦 Provisioning Format
 
 SSID | Wi-Fi Password | Firebase Email | Firebase Password | Band ID
 
-The ESP32 stores the configuration in non-volatile storage and uses it to connect to Wi-Fi and Firebase.
+The ESP32 stores the configuration in non-volatile storage and uses it
+to connect to Wi-Fi and Firebase.
 
 📌 Pin Configuration
 
@@ -398,81 +385,60 @@ SafeBand/
 
 ⚙️ Installation & Setup
 
-1️⃣ ESP32 Firmware
+1️⃣ Set Up ESP32
 
 Open the firmware project using PlatformIO or Arduino IDE.
 
-2️⃣ Connect the Sensors
+2️⃣ Connect Sensors
 
-Connect the MPU6050, Pulse Sensor, and BMP280/BME280 according to the pin configuration.
+Connect the MPU6050, Pulse Sensor, and BMP280/BME280 according to the
+pin configuration.
 
 3️⃣ Configure Firebase
 
-Create the Firebase project and Realtime Database, then add the required Firebase configuration to:
+Create/configure the Firebase project and Realtime Database, then add
+the required Firebase configuration.
 
-firebase_config.h
+4️⃣ Add Machine Learning Model
 
-4️⃣ Add the ML Model
-
-Place the generated model file in the firmware include directory:
+Place:
 
 fall_model.h
 
+inside the firmware include directory.
+
 5️⃣ Upload Firmware
 
-Connect the ESP32, select the correct board and COM port, build the project, and upload the firmware.
+Connect the ESP32, select the correct board and COM port, build the
+project, and upload the firmware.
 
-6️⃣ Configure Through BLE
+6️⃣ Configure the Wearable
 
-Provide:
+Use BLE provisioning to provide:
 
 📶 Wi-Fi credentials
 ☁️ Firebase credentials
 🆔 Band ID
 
-7️⃣ Run Flutter App
+7️⃣ Run Flutter Application
 
-Open the Flutter project, install dependencies, and run the application on an Android device or emulator.
+Open the Flutter project, install the required dependencies, and run the
+application on an Android device or emulator.
 
 🧪 Testing & Diagnostics
 
-The firmware provides serial commands for development and testing.
+The firmware provides serial commands for testing and diagnostics.
 
-Command
+Command   Function
 
-Function
-
-f
-
-🚨 Trigger a fake fall
-
-b
-
-🔵 Release BLE
-
-h
-
-💾 Show heap information
-
-s
-
-🔧 Show sensor status
-
-i
-
-🔄 Re-initialize sensors
-
-w
-
-📶 Show saved Wi-Fi
-
-c
-
-🔄 Clear boot count and restart
-
-r
-
-🗑️ Factory reset
+f       🚨 Trigger a fake fall
+b       🔵 Release BLE
+h       💾 Show heap information
+s       🔧 Show sensor status
+i       🔄 Re-initialize sensors
+w       📶 Show saved Wi-Fi
+c       🔄 Clear boot count and restart
+r       🗑️ Factory reset
 
 🚨 Emergency Flow
 
@@ -482,51 +448,53 @@ r
        ↓
 🤖 ML Prediction
        ↓
-🔍 Fall Confirmation
+🔍 Additional Confirmation
        ↓
-   ┌───┴───┐
-   │       │
-  ❌ No   🚨 Yes
-   │       │
-   ▼       ▼
+   ┌───┴────┐
+   │        │
+  ❌ No    🚨 Yes
+   │        │
+   ▼        ▼
 Continue  Emergency
 Monitoring  State
-             │
-             ▼
-          📶 Wi-Fi
-             │
-             ▼
-        ☁️ Firebase
-             │
-             ▼
-        📱 Flutter
-             │
-             ▼
-       👨‍👩‍👧 Family
+              │
+              ▼
+           📶 Wi-Fi
+              │
+              ▼
+         ☁️ Firebase
+              │
+              ▼
+         📱 Flutter
+              │
+              ▼
+        👨‍👩‍👧 Family
 
 ⚠️ Limitations
 
 📶 Cloud synchronization currently depends on Wi-Fi connectivity.
 
-🧠 Machine Learning predictions may contain errors.
+🧠 Machine Learning predictions can contain errors.
 
-📐 Sensor readings can be affected by sensor placement and environmental conditions.
+📐 Sensor readings can be affected by sensor placement and
+environmental conditions.
 
 🫁 The current SpO₂ value is a simulated placeholder.
 
-🏥 SafeBand is an academic/prototype system and is not a replacement for professional medical or emergency services.
+🏥 SafeBand is a prototype/academic project and is not a replacement
+for professional medical or emergency services.
 
 🚀 Future Enhancements
 
 📍 GPS-based location tracking
 
-📡 GSM/LTE connectivity
+📡 GSM/LTE communication
 
 ❤️ Dedicated optical heart-rate and SpO₂ sensor
 
 🔔 Push notifications
 
-💾 Offline data storage and synchronization
+💾 Offline data buffering and synchronization
 
 🧠 Larger and more diverse fall-detection dataset
 
@@ -554,18 +522,27 @@ Monitoring  State
    ↓
 🛡️ PROTECT
 
-SafeBand follows this pipeline to collect sensor information, process it locally, detect possible falls, confirm the event, communicate the status to the cloud, and provide the information to the family member.
+SafeBand follows this pipeline to sense the wearer's information,
+process it locally, detect a possible fall, confirm the event,
+communicate the status to the cloud, and provide the information through
+the mobile application.
 
-💚 SafeBand
+📜 Project Status
 
-<div align="center">
+SafeBand --- Version 1.0
 
-“Wear it for the ones who care.”
+🎓 Developed as an academic/prototype project combining:
 
-⌚ Sensors → 🧠 ESP32 → 🤖 ML → 📶 Wi-Fi → ☁️ Firebase → 📱 Flutter → 👨‍👩‍👧 Family
+IoT + Embedded Systems + Machine Learning + Cloud Database + Mobile
+Application
 
-🛡️ Safety Today. A Better Tomorrow.
+::: {align="center"}
+
+🛡️ SafeBand
+
+💚 Wear it for the ones who care.
+
+⌚ Sensors → 🧠 ESP32 → 🤖 ML → 📶 Wi-Fi → ☁️ Firebase → 📱 Flutter
 
 Version 1.0
-
-</div>
+:::
